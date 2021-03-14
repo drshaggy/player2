@@ -12,9 +12,12 @@ class TicTacToeBoard extends Board {
   TicTacToeBoard() {
     position = "000000000";
     positionToList(position);
+    calculatePlayerTurn();
   }
   @override
-  TicTacToeBoard.copy(TicTacToeBoard board) : super.copy(board);
+  TicTacToeBoard.copy(TicTacToeBoard board) : super.copy(board) {
+    positionToList(board.position);
+  }
 
   TicTacToeBoard.position(String pos) {
     if (pos.length != 9) {
@@ -35,14 +38,15 @@ class TicTacToeBoard extends Board {
     });
     position = pos;
     positionToList(pos);
+    calculatePlayerTurn();
   }
 
   @override
-  List<Move> legalMoves(int playerNo) {
+  List<Move> legalMoves() {
     List<Move> moves = [];
     _positionAsList.asMap().forEach((index, element) {
       if (element == 0) {
-        moves.add(TicTacToeMove(playerNo, index));
+        moves.add(TicTacToeMove(playerTurn, index));
       }
     });
     return moves;
@@ -59,12 +63,19 @@ class TicTacToeBoard extends Board {
     });
     TicTacToeBoard newBoard =
         new TicTacToeBoard.position(positionStringFromList(newPos));
+    newBoard.moves.add(move);
+
     return newBoard;
   }
 
   @override
-  Move randomMove(playerNo) {
-    List<Move> moves = legalMoves(playerNo);
+  TicTacToeMove getLastMove() {
+    return moves[moves.length - 1];
+  }
+
+  @override
+  Move randomMove() {
+    List<Move> moves = legalMoves();
     moves.shuffle();
     return moves[0];
   }
@@ -143,5 +154,21 @@ class TicTacToeBoard extends Board {
       positionString = positionString + element.toString();
     });
     return positionString;
+  }
+
+  void calculatePlayerTurn() {
+    int numberOfOnes = positionAsList
+        .map((element) => element == 1 ? 1 : 0)
+        .reduce((value, element) => value + element);
+
+    int numberOfTwos = positionAsList
+        .map((element) => element == 2 ? 1 : 0)
+        .reduce((value, element) => value + element);
+
+    if (numberOfOnes == numberOfTwos) {
+      playerTurn = 1;
+    } else {
+      playerTurn = 2;
+    }
   }
 }

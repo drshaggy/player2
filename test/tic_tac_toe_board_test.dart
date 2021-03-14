@@ -166,6 +166,16 @@ void main() {
         newBoard = newBoard.makeMove(move);
         expect(newBoard.position, "102000000");
       });
+      test('PlayerTurn is changed successfully on each go', () {
+        TicTacToeBoard board = new TicTacToeBoard.position('000000000');
+        expect(board.playerTurn, 1);
+        Move move = new TicTacToeMove(1, 0);
+        board = board.makeMove(move);
+        expect(board.playerTurn, 2);
+        move = new TicTacToeMove(2, 2);
+        board = board.makeMove(move);
+        expect(board.playerTurn, 1);
+      });
       test('Throws exception when player 2 tries to make illegal move', () {
         TicTacToeBoard board = new TicTacToeBoard.position('000000000');
         Move move = new TicTacToeMove(1, 0);
@@ -185,6 +195,50 @@ void main() {
         TicTacToeBoard newBoard = TicTacToeBoard.copy(board);
         expect(newBoard, isNot(board));
         expect(newBoard.position, board.position);
+        expect(newBoard.moves, board.moves);
+        expect(newBoard.playerTurn, board.playerTurn);
+      });
+    });
+    group('calculatePlayerTurn() -', () {
+      test('Calculate player turn on starting position, should be 1', () {
+        TicTacToeBoard board = new TicTacToeBoard.position("000000000");
+        expect(board.playerTurn, 1);
+      });
+      test('Calculate player turn on player 2s turn, should be 2', () {
+        TicTacToeBoard board = new TicTacToeBoard.position("100000000");
+        expect(board.playerTurn, 2);
+      });
+      test('Calculate player turn on player 1s turn, should be 1', () {
+        TicTacToeBoard board = new TicTacToeBoard.position("120000000");
+        expect(board.playerTurn, 1);
+      });
+      test('Calculate player turn on player 2s turn, should be 2', () {
+        TicTacToeBoard board = new TicTacToeBoard.position("121000000");
+        expect(board.playerTurn, 2);
+      });
+      test('Calculate player turn on player 1s turn, should be 1', () {
+        TicTacToeBoard board = new TicTacToeBoard.position("121200000");
+        expect(board.playerTurn, 1);
+      });
+      test('Calculate player turn on player 2s turn, should be 2', () {
+        TicTacToeBoard board = new TicTacToeBoard.position("121210000");
+        expect(board.playerTurn, 2);
+      });
+      test('Calculate player turn on player 1s turn, should be 1', () {
+        TicTacToeBoard board = new TicTacToeBoard.position("121212000");
+        expect(board.playerTurn, 1);
+      });
+      test('Calculate player turn on player 2s turn, should be 2', () {
+        TicTacToeBoard board = new TicTacToeBoard.position("121212200");
+        expect(board.playerTurn, 2);
+      });
+      test('Calculate player turn on player 1s turn, should be 1', () {
+        TicTacToeBoard board = new TicTacToeBoard.position("121212210");
+        expect(board.playerTurn, 1);
+      });
+      test('Calculate player turn on player 2s turn, should be 2', () {
+        TicTacToeBoard board = new TicTacToeBoard.position("121212212");
+        expect(board.playerTurn, 2);
       });
     });
   });

@@ -6,6 +6,11 @@ class Tree {
   Node rootNode;
 
   Tree(Board board) {
-    rootNode = Node(State(board, 1));
+    rootNode = Node(State(board));
+  }
+
+  void setRoot(Node node) {
+    State state = new State(node.state.board);
+    rootNode = Node(state);
   }
 }

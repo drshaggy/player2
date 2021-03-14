@@ -9,10 +9,10 @@ void main() {
     group('uctValue() -', () {
       test('Returns infinity is si is 0', () {
         TicTacToeBoard board = new TicTacToeBoard();
-        State state = new State(board, 1);
+        State state = new State(board);
         Node parentNode = new Node(state);
         board = new TicTacToeBoard.position("100000000");
-        state = new State(board, 2);
+        state = new State(board);
         Node childNode = new Node(state);
         double val = UCT.uctValue(parentNode, childNode);
         expect(val, double.infinity);

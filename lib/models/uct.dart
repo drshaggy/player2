@@ -19,8 +19,7 @@ class UCT {
   static Node selectionFunction(Node parentNode) {
     Node promisingNode;
     double highestUctValue = 0;
-    int simsParent = parentNode.state.sims;
-    List<Node> childrenNodes = parentNode.getChildrenNodes();
+    List<Node> childrenNodes = parentNode.childrenNodes;
     childrenNodes.forEach((childNode) {
       double uctVal = uctValue(parentNode, childNode);
       if (uctVal > highestUctValue) {

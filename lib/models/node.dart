@@ -10,13 +10,28 @@ class Node {
 
   State get state => _state;
   Node get parent => _parentNode;
+  List<Node> get childrenNodes => _childrenNodes;
 
-  List<Node> getChildrenNodes() {
+  void generateChildrenNodes() {
     _childrenNodes = [];
     List<State> possibleStates = _state.getAllPossibleStates();
     possibleStates.forEach((state) {
       _childrenNodes.add(Node.parent(state, this));
     });
-    return _childrenNodes;
+  }
+
+  Node getChildWithMaxScore() {
+    Node maxScoreNode = this;
+    if (_childrenNodes != null) {
+      maxScoreNode = _childrenNodes[0];
+      double maxScore = 0;
+      _childrenNodes.forEach((node) {
+        if (node.state.wins > maxScore) {
+          maxScore = node.state.wins;
+          maxScoreNode = node;
+        }
+      });
+    }
+    return maxScoreNode;
   }
 }
