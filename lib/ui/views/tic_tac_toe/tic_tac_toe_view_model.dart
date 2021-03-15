@@ -95,5 +95,6 @@ class TicTacToeViewModel extends BaseViewModel {
 
   void replay() {
     initialise();
+    notifyListeners();
   }
 }
