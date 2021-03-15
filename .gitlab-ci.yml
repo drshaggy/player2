@@ -3,7 +3,7 @@ stages:
   - build # All jobs related for building app for iOS and Android
   - deploy
 
-flutter_test: # Name of the lane
+test: # Name of the lane
   stage: test # type of stage
   script:
     - flutter test --coverage ./lib # Run Flutter test
@@ -15,7 +15,7 @@ flutter_test: # Name of the lane
   tags:
     - flutter # Tags for runner
 
-flutter_build_android: #Job name
+android_build: #Job name
   stage: build # kind of job
   before_script:
     - flutter packages get
@@ -33,7 +33,7 @@ flutter_build_android: #Job name
   tags:
     - flutter
 
-flutter_build_windows: #Job name
+windows_build: #Job name
   stage: build # kind of job
   before_script:
     - flutter packages get
@@ -45,6 +45,24 @@ flutter_build_windows: #Job name
   artifacts:
     paths:
       - build/windows/runner/Release/player2.msix
+      - CI_JOB_ID.txt
+    expire_in: never
+  rules:
+    - if: $CI_COMMIT_TAG
+  tags:
+    - flutter
+
+web_build: #Job name
+  stage: build # kind of job
+  before_script:
+    - flutter packages get
+    - flutter clean
+  script:
+     - flutter build web
+     - echo "${CI_JOB_ID}" > CI_JOB_ID.txt
+  artifacts:
+    paths:
+      - build/web/
       - CI_JOB_ID.txt
     expire_in: never
   rules:
