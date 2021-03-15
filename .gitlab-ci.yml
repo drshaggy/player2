@@ -5,6 +5,9 @@ stages:
 
 test: # Name of the lane
   stage: test # type of stage
+    before_script:
+    - flutter packages get
+    - flutter clean
   script:
     - flutter test --coverage ./lib # Run Flutter test
     - perl tools/lcov.perl -r coverage/lcov.info '*/__test*__/*' -o coverage/lcov_cleaned.info
@@ -17,9 +20,6 @@ test: # Name of the lane
 
 android_build: #Job name
   stage: build # kind of job
-  before_script:
-    - flutter packages get
-    - flutter clean
   script:
      - flutter build apk
      - echo "${CI_JOB_ID}" > CI_JOB_ID.txt
@@ -35,9 +35,6 @@ android_build: #Job name
 
 windows_build: #Job name
   stage: build # kind of job
-  before_script:
-    - flutter packages get
-    - flutter clean
   script:
      - flutter build windows
      - flutter pub run msix:create
