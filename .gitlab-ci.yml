@@ -5,7 +5,7 @@ stages:
 
 test: # Name of the lane
   stage: test # type of stage
-    before_script:
+  before_script:
     - flutter packages get
     - flutter clean
   script:
@@ -66,9 +66,6 @@ web_build: #Job name
 
 pages:
   stage: deploy
-  before_script:
-    - flutter packages get
-    - flutter clean
   script:
     - cp -r build/web public
   artifacts:
