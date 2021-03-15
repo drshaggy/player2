@@ -1,4 +1,4 @@
-[![pipeline status](https://gitlab.com/drshaggy/player2/badges/master/pipeline.svg)](https://gitlab.com/drshaggy/player2/-/commits/master)
+[![pipeline status](https://gitlab.com/drshaggy/player2/badges/master/pipeline.svg)](https://gitlab.com/drshaggy/player2/-/pipelines)
 [![coverage report](https://gitlab.com/drshaggy/player2/badges/master/coverage.svg)](https://gitlab.com/drshaggy/player2/-/commits/master)
 
 # player2
