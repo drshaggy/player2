@@ -1,6 +1,12 @@
 # player2
 
-A new Flutter project.
+An AI written in flutter that can play 2 player zero sum games. Its uses a Monte Carlo Tree Search algorithm to find the next move.
+
+### Suported games
+- [x] Tic Tac Toe
+- [ ] Connect 4
+- [ ] Chess
+- [ ] Go
 
 ## Getting Started
 
