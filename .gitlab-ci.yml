@@ -54,9 +54,6 @@ windows_build: #Job name
 
 web_build: #Job name
   stage: build # kind of job
-  before_script:
-    - flutter packages get
-    - flutter clean
   script:
      - flutter build web
      - echo "${CI_JOB_ID}" > CI_JOB_ID.txt
