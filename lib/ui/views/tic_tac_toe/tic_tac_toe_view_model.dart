@@ -8,7 +8,7 @@ import 'package:stacked/stacked.dart';
 
 class TicTacToeViewModel extends BaseViewModel {
   List<Widget> boardLayout;
-  int playerNo = 2;
+  int playerNo = 1;
   TicTacToeBoard board;
   String playerPiece = "";
   String gameMessage = "";

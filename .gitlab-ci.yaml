@@ -1,0 +1,68 @@
+stages:
+  - test # All jobs related for testing such as Unit Test
+  - build # All jobs related for building app for iOS and Android
+  - deploy
+
+flutter_test: # Name of the lane
+  stage: test # type of stage
+  script:
+    - flutter test --coverage ./lib # Run Flutter test
+    - perl tools/lcov.perl -r coverage/lcov.info '*/__test*__/*' -o coverage/lcov_cleaned.info
+    - perl tools/genhtml.perl coverage/lcov_cleaned.info --output=coverage
+  artifacts:
+    paths:
+      - coverage
+  tags:
+    - flutter # Tags for runner
+
+flutter_build_android: #Job name
+  stage: build # kind of job
+  before_script:
+    - flutter packages get
+    - flutter clean
+  script:
+     - flutter build apk
+     - echo "${CI_JOB_ID}" > CI_JOB_ID.txt
+  artifacts:
+    paths:
+      - build/app/outputs/apk/release/app-release.apk
+      - CI_JOB_ID.txt
+    expire_in: never
+  rules:
+    - if: $CI_COMMIT_TAG
+  tags:
+    - flutter
+
+flutter_build_windows: #Job name
+  stage: build # kind of job
+  before_script:
+    - flutter packages get
+    - flutter clean
+  script:
+     - flutter build windows
+     - flutter pub run msix:create
+     - echo "${CI_JOB_ID}" > CI_JOB_ID.txt
+  artifacts:
+    paths:
+      - build/windows/runner/Release/player2.msix
+      - CI_JOB_ID.txt
+    expire_in: never
+  rules:
+    - if: $CI_COMMIT_TAG
+  tags:
+    - flutter
+
+pages:
+  stage: deploy
+  before_script:
+    - flutter packages get
+    - flutter clean
+  script:
+    - cp -r build/web public
+  artifacts:
+    paths:
+      - public/
+  rules:
+    - if: $CI_COMMIT_TAG
+  tags: 
+    - flutter
