@@ -9,7 +9,22 @@ class StartUpView extends StatelessWidget {
   Widget build(BuildContext context) {
     return ViewModelBuilder<StartUpViewModel>.reactive(
       onModelReady: (model) => model.initialise(),
-      builder: (context, model, child) => Scaffold(),
+      builder: (context, model, child) => Scaffold(
+        body: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: ListView(
+              children: [
+                TextButton(
+                  onPressed: () => model.ticTacToeButton(),
+                  child: ListTile(
+                    title: Center(
+                      child: Text("Tic Tac Toe"),
+                    ),
+                  ),
+                ),
+              ],
+            )),
+      ),
       viewModelBuilder: () => StartUpViewModel(),
     );
   }

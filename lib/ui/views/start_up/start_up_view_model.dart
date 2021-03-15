@@ -12,6 +12,9 @@ class StartUpViewModel extends BaseViewModel {
 
   void startUpLogic() async {
     await Future.delayed(Duration(microseconds: 200));
-    await _navigationService.clearStackAndShow(Routes.ticTacToeView);
+  }
+
+  void ticTacToeButton() async {
+    await _navigationService.navigateTo(Routes.ticTacToeView);
   }
 }
