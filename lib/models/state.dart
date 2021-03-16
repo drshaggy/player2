@@ -8,6 +8,8 @@ class State {
 
   State(this.board);
 
+  State.test(this.board, {this.wins = 0, this.sims = 0});
+
   List<State> getAllPossibleStates() {
     List<Move> moves = board.legalMoves();
     List<State> possibleStates = [];

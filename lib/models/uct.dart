@@ -18,7 +18,7 @@ class UCT {
   static Node selectionFunction(Node parentNode) {
     Node promisingNode;
     double highestUctValue = 0;
-    List<Node> childrenNodes = parentNode.childrenNodes;
+    List<Node> childrenNodes = parentNode.getChildrenNodes();
     int sp = parentNode.state.sims;
     childrenNodes.forEach((childNode) {
       double wi = childNode.state.wins;

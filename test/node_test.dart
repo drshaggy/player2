@@ -10,23 +10,23 @@ void main() {
         TicTacToeBoard board = new TicTacToeBoard();
         Node node = new Node(State(board));
         node.generateUnexploredNodes();
-        expect(node.unexploredNodes.length, 9);
+        expect(node.getUnexploredNodes().length, 9);
       });
       test('Check the children nodes have correct parent node', () {
         TicTacToeBoard board = new TicTacToeBoard();
         Node node = new Node(State(board));
         node.generateUnexploredNodes();
-        node.unexploredNodes.forEach((unexploredNode) {
-          expect(unexploredNode.parent, node);
+        node.getUnexploredNodes().forEach((unexploredNode) {
+          expect(unexploredNode.parentNode, node);
         });
       });
       test('Check the parent node has children with children nodes', () {
         TicTacToeBoard board = new TicTacToeBoard();
         Node node = new Node(State(board));
         node.generateUnexploredNodes();
-        node.childrenNodes.add(node.popRandomUnexploredNode());
-        node.childrenNodes[0].generateUnexploredNodes();
-        expect(node.childrenNodes[0].unexploredNodes, isNot([]));
+        node.getChildrenNodes().add(node.popRandomUnexploredNode());
+        node.getChildrenNodes()[0].generateUnexploredNodes();
+        expect(node.getChildrenNodes()[0].getUnexploredNodes(), isNot([]));
       });
     });
     group('isLeaf() -', () {
@@ -38,7 +38,7 @@ void main() {
       test('Check if isLeaf() returns false when node is not terminal', () {
         Node node = Node(State(TicTacToeBoard()));
         node.generateUnexploredNodes();
-        node.childrenNodes.add(node.popRandomUnexploredNode());
+        node.addChildNode(node.popRandomUnexploredNode());
         expect(node.isLeaf(), false);
       });
     });
@@ -51,7 +51,7 @@ void main() {
       test('Check if isNotLeaf() returns true when node is not terminal', () {
         Node node = Node(State(TicTacToeBoard()));
         node.generateUnexploredNodes();
-        node.childrenNodes.add(node.popRandomUnexploredNode());
+        node.addChildNode(node.popRandomUnexploredNode());
         expect(node.isNotLeaf(), true);
       });
     });

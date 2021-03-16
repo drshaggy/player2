@@ -13,9 +13,9 @@ class Node {
   Node.parent(this._state, this._parentNode);
 
   State get state => _state;
-  Node get parent => _parentNode;
-  List<Node> get childrenNodes => _childrenNodes;
-  List<Node> get unexploredNodes => _unexploredNodes;
+  Node get parentNode => _parentNode;
+  // List<Node> get childrenNodes => _childrenNodes;
+  // List<Node> get unexploredNodes => _unexploredNodes;
 
   void generateUnexploredNodes() {
     _unexploredNodes = [];
@@ -63,5 +63,18 @@ class Node {
 
   bool isFullyExplored() {
     return _unexploredNodes.isEmpty;
+  }
+
+  List<Node> getChildrenNodes() {
+    return _childrenNodes;
+  }
+
+  List<Node> getUnexploredNodes() {
+    return _unexploredNodes;
+  }
+
+  void addChildNode(Node node) {
+    node._parentNode = this;
+    _childrenNodes.add(node);
   }
 }

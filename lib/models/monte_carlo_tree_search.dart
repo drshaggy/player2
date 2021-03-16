@@ -59,8 +59,8 @@ class MonteCarloTreeSearch {
     return node.getChildWithBestMove(bestMoveType);
   }
 
-  Node selection(Node node) {
-    if (node.unexploredNodes == null) {
+  static Node selection(Node node) {
+    if (node.getUnexploredNodes() == null) {
       node.generateUnexploredNodes();
     }
     while (node.isNotLeaf() && node.isFullyExplored()) {
@@ -69,20 +69,20 @@ class MonteCarloTreeSearch {
     return node;
   }
 
-  Node expansion(Node node) {
-    if (node.unexploredNodes == null) {
+  static Node expansion(Node node) {
+    if (node.getUnexploredNodes() == null) {
       node.generateUnexploredNodes();
     }
     if (node.state.sims == 0) {
       return node;
     } else {
       Node expandedNode = node.popRandomUnexploredNode();
-      node.childrenNodes.add(expandedNode);
+      node.addChildNode(expandedNode);
       return expandedNode;
     }
   }
 
-  double rollOut(Node node) {
+  static double rollOut(Node node) {
     // TODO find a way to make this not specific to tic tac toe
     Board board = new TicTacToeBoard.copy(node.state.board);
     double winCondition = board.checkWinCondition();
@@ -94,20 +94,20 @@ class MonteCarloTreeSearch {
     return winCondition;
   }
 
-  void backPropagation(Node node, double winCondition) {
+  static void backPropagation(Node node, double winCondition) {
     while (node != null) {
       bool nodeWins = node.state.board.playerTurn == winCondition;
       bool nodeDraws = winCondition == 0.5;
       node.state.sims = node.state.sims + 1;
       // * The win condition is flipped due to the fact that each node’s
       // * statistics are used for its parent node’s choice, not its own.
-      if (nodeWins == false && nodeDraws == false) {
+      if (nodeWins && nodeDraws == false) {
         node.state.wins = node.state.wins + 1;
       }
       if (nodeDraws) {
         node.state.wins = node.state.wins + 0.5;
       }
-      node = node.parent;
+      node = node.parentNode;
     }
   }
 }
