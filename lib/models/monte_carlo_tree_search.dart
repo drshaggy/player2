@@ -20,21 +20,26 @@ class MonteCarloTreeSearch {
   }
 
   Future<Move> findNextMove({bool debug = false}) async {
-    Node node = tree.rootNode;
+    Node startNode = tree.rootNode;
+    Node node;
+    int simulations = 0;
 
     if (_iteration == null) {
       DateTime endTime = DateTime.now().add(duration);
       while (DateTime.now().isBefore(endTime)) {
-        node = findMoveLoop(node);
+        simulations++;
+        node = findMoveLoop(startNode, debug: debug);
       }
     } else {
       for (int i = 0; i < _iteration; i++) {
-        node = findMoveLoop(node);
+        simulations++;
+        node = findMoveLoop(startNode, debug: debug);
       }
     }
-    Node winnerNode = nodeWithBestMove(node);
+    Node winnerNode = nodeWithBestMove(startNode);
     tree.setRoot(winnerNode);
     if (debug) print("findNextMove complete");
+    print("simulations: $simulations");
     return winnerNode.state.board.getLastMove();
   }
 
@@ -46,8 +51,8 @@ class MonteCarloTreeSearch {
     if (winCondition == 0) {
       promisingNode = expansion(promisingNode);
       winCondition = rollOut(promisingNode);
-      backPropagation(promisingNode, winCondition);
     }
+    backPropagation(promisingNode, winCondition);
 
     return promisingNode;
   }

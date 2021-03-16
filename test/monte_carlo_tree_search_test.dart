@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:player2/models/boards/board.dart';
 import 'package:player2/models/boards/move.dart';
 import 'package:player2/models/boards/tic_tac_toe_board.dart';
 import 'package:player2/models/boards/tic_tac_toe_move.dart';
@@ -111,45 +112,100 @@ void main() {
       });
     });
     group('backPropagation() -', () {
-      test('Tests if parents stats get update properly in propagation', () {
-        TicTacToeBoard board = TicTacToeBoard.position("000000000");
-        MonteCarloTreeSearch mcts =
-            MonteCarloTreeSearch(board, Duration(seconds: 1));
-        State state = State.test(board, wins: 1, sims: 3);
-        Node node = Node(state);
+      Board board;
+      MonteCarloTreeSearch mcts;
+      State state;
+      Node node;
 
+      setUp(() {
+        board = TicTacToeBoard();
+        mcts = MonteCarloTreeSearch(board, Duration(seconds: 1));
+
+        // * Root Node
+        state = State.test(board, wins: 3, sims: 4);
+        node = Node(state);
+
+        // * First Child
         TicTacToeMove move = TicTacToeMove(1, 0);
-        board.makeMove(move);
-        state = State.test(board, wins: 2, sims: 2);
+        board = board.makeMove(move);
+        state = State.test(board, wins: 1, sims: 3);
         node.addChildNode(Node(state));
         node = node.getChildrenNodes()[0];
 
+        // * Second Child
         move = TicTacToeMove(2, 1);
-        board.makeMove(move);
+        board = board.makeMove(move);
         state = State.test(board, wins: 2, sims: 2);
         node.addChildNode(Node(state));
         node = node.getChildrenNodes()[0];
 
-        move = TicTacToeMove(1, 4);
-        board.makeMove(move);
+        // * Third Child
+        move = TicTacToeMove(1, 2);
+        board = board.makeMove(move);
         state = State.test(board, wins: 0, sims: 1);
         node.addChildNode(Node(state));
         node = node.getChildrenNodes()[0];
 
-        move = TicTacToeMove(2, 8);
-        board.makeMove(move);
-        state = State.test(board);
+        // * Fourth Child
+        move = TicTacToeMove(2, 3);
+        board = board.makeMove(move);
+        state = State.test(board, wins: 0, sims: 0);
         node.addChildNode(Node(state));
         node = node.getChildrenNodes()[0];
 
-        double winCondition = 2;
+        double winCondition = 0.5;
         MonteCarloTreeSearch.backPropagation(node, winCondition);
-
+      });
+      test('Check leaf node sims is 1', () {
         expect(node.state.sims, 1);
-        expect(node.state.wins, 0);
+      });
+      test('Check leaf node wins is 0.5', () {
+        expect(node.state.wins, 0.5);
+      });
+      test('Check (leaf node - 1) sims is 2', () {
         node = node.parentNode;
         expect(node.state.sims, 2);
-        expect(node.state.wins, 1);
+      });
+      test('Check (leaf node -1) wins is 0.5', () {
+        node = node.parentNode;
+        expect(node.state.wins, 0.5);
+      });
+      test('Check (leaf node - 2) sims is 3', () {
+        node = node.parentNode;
+        node = node.parentNode;
+        expect(node.state.sims, 3);
+      });
+      test('Check (leaf node -2) wins is 2.5', () {
+        node = node.parentNode;
+        node = node.parentNode;
+        expect(node.state.wins, 2.5);
+      });
+      test('Check (leaf node -3) sims is 4', () {
+        node = node.parentNode;
+        node = node.parentNode;
+        node = node.parentNode;
+        expect(node.state.sims, 4);
+      });
+      test('Check (leaf node - 3) wins is 1.5', () {
+        node = node.parentNode;
+        node = node.parentNode;
+        node = node.parentNode;
+        expect(node.state.wins, 1.5);
+      });
+      test('Check (root node) sims is 5', () {
+        node = node.parentNode;
+        node = node.parentNode;
+        node = node.parentNode;
+        node = node.parentNode;
+        expect(node.state.sims, 5);
+      });
+      test('Check (root node) wins is 3.5', () {
+        node = node.parentNode;
+        node = node.parentNode;
+        node = node.parentNode;
+        node = node.parentNode;
+        expect(node.parentNode, null);
+        expect(node.state.wins, 3.5);
       });
     });
     group('findNextMove() -', () {
@@ -158,7 +214,7 @@ void main() {
         TicTacToeBoard board = new TicTacToeBoard();
         MonteCarloTreeSearch mcts = new MonteCarloTreeSearch(board, duration);
 
-        Move move = await mcts.findNextMove(debug: true);
+        Move move = await mcts.findNextMove();
         expect(move != null, true);
       });
       test(
@@ -168,7 +224,7 @@ void main() {
         TicTacToeBoard board = new TicTacToeBoard();
         MonteCarloTreeSearch mcts = new MonteCarloTreeSearch(board, duration);
 
-        Move move = await mcts.findNextMove(debug: true);
+        Move move = await mcts.findNextMove();
         expect(move != null, true);
       });
       test(
@@ -178,9 +234,12 @@ void main() {
         TicTacToeBoard board = new TicTacToeBoard();
         MonteCarloTreeSearch mcts =
             new MonteCarloTreeSearch.iteration(board, iter);
-
-        Move move = await mcts.findNextMove(debug: true);
-        expect(move != null, true);
+        try {
+          Move move = await mcts.findNextMove();
+        } on Exception catch (e) {
+          expect(e.toString(),
+              "Exception: Not enough information to make a decision on a move");
+        }
       });
       test(
           'Testing findNextMove on iteration mode with 10 iterations returns a new board with one move',
@@ -190,18 +249,18 @@ void main() {
         MonteCarloTreeSearch mcts =
             new MonteCarloTreeSearch.iteration(board, iter);
 
-        Move move = await mcts.findNextMove(debug: true);
+        Move move = await mcts.findNextMove();
         expect(move != null, true);
       });
       test(
-          'Testing findNextMove on iteration mode with 20 iterations returns a new board with one move',
+          'Testing findNextMove on iteration mode with 100 iterations returns a new board with one move',
           () async {
-        int iter = 20;
+        int iter = 100;
         TicTacToeBoard board = new TicTacToeBoard();
         MonteCarloTreeSearch mcts =
             new MonteCarloTreeSearch.iteration(board, iter);
 
-        Move move = await mcts.findNextMove(debug: true);
+        Move move = await mcts.findNextMove();
         expect(move != null, true);
       });
     });

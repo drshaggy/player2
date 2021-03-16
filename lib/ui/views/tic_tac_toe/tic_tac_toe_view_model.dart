@@ -48,10 +48,10 @@ class TicTacToeViewModel extends BaseViewModel {
   Future<void> aiMove() async {
     if (isStillPlaying()) {
       MonteCarloTreeSearch mcts =
-          new MonteCarloTreeSearch(board, Duration(seconds: 10));
+          new MonteCarloTreeSearch(board, Duration(seconds: 1));
 
       Move move = await mcts.findNextMove();
-      board.makeMove(move);
+      board = board.makeMove(move);
 
       checkWin();
       generateBoardLayout();
