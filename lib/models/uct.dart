@@ -3,25 +3,27 @@ import 'dart:math';
 import 'package:player2/models/node.dart';
 
 class UCT {
-  static double uctValue(Node parentNode, Node childNode) {
+  static double uctValue(double noOfWins, int noOfSims, int noOfParentSims,
+      {double explorationParameter = sqrt2}) {
     // * uctValue = (wi / si) + c sqrt(ln(sp)/si)
     // * where wi = child node simulation wins, si = child node number of sims,
     // * sp = parent nodes number of sims, c = exploration param (typically sqrt(2))
 
-    double wi = childNode.state.wins;
-    int si = childNode.state.sims;
-    int sp = parentNode.state.sims;
-    double c = sqrt(2);
-
-    return si == 0 ? double.infinity : (wi / si) + c * sqrt(log(sp) / si);
+    return noOfSims == 0
+        ? double.infinity
+        : (noOfWins / noOfSims) +
+            explorationParameter * sqrt(log(noOfParentSims) / noOfSims);
   }
 
   static Node selectionFunction(Node parentNode) {
     Node promisingNode;
     double highestUctValue = 0;
     List<Node> childrenNodes = parentNode.childrenNodes;
+    int sp = parentNode.state.sims;
     childrenNodes.forEach((childNode) {
-      double uctVal = uctValue(parentNode, childNode);
+      double wi = childNode.state.wins;
+      int si = childNode.state.sims;
+      double uctVal = uctValue(wi, si, sp);
       if (uctVal > highestUctValue) {
         highestUctValue = uctVal;
         promisingNode = childNode;

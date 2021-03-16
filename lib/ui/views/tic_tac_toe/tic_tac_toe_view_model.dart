@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:player2/models/boards/move.dart';
 import 'package:player2/models/boards/tic_tac_toe_board.dart';
 import 'package:player2/models/boards/tic_tac_toe_move.dart';
 import 'package:player2/models/monte_carlo_tree_search.dart';
@@ -13,7 +14,7 @@ class TicTacToeViewModel extends BaseViewModel {
   String playerPiece = "";
   String gameMessage = "";
 
-  void initialise() {
+  void initialise() async {
     gameMessage = "";
     if (playerNo == 1) {
       playerPiece = "Crosses";
@@ -44,12 +45,13 @@ class TicTacToeViewModel extends BaseViewModel {
     }
   }
 
-  void aiMove() {
+  Future<void> aiMove() async {
     if (isStillPlaying()) {
       MonteCarloTreeSearch mcts =
           new MonteCarloTreeSearch(board, Duration(seconds: 10));
 
-      board = mcts.findNextMove();
+      Move move = await mcts.findNextMove();
+      board.makeMove(move);
 
       checkWin();
       generateBoardLayout();
@@ -57,8 +59,9 @@ class TicTacToeViewModel extends BaseViewModel {
     }
   }
 
-  void update(int index) {
+  void update(int index) async {
     playerMove(index);
+    await Future.delayed(Duration(milliseconds: 200));
     aiMove();
   }
 

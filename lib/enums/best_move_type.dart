@@ -1,0 +1,4 @@
+enum BestMoveType {
+  robust,
+  max,
+}

@@ -1,3 +1,4 @@
+import 'package:player2/enums/best_move_type.dart';
 import 'package:player2/models/boards/board.dart';
 import 'package:player2/models/boards/move.dart';
 import 'package:player2/models/boards/tic_tac_toe_board.dart';
@@ -18,63 +19,67 @@ class MonteCarloTreeSearch {
     tree = new Tree(board);
   }
 
-  Board findNextMove() {
-    Node startNode = tree.rootNode;
+  Future<Move> findNextMove({bool debug = false}) async {
+    Node node = tree.rootNode;
 
     if (_iteration == null) {
       DateTime endTime = DateTime.now().add(duration);
       while (DateTime.now().isBefore(endTime)) {
-        Node promisingNode = selection(startNode);
-        if (promisingNode == null) break;
-        Node rollOutNode = expansion(promisingNode);
-        if (rollOutNode == null) break;
-        double winCondition = rollOut(rollOutNode);
-        backPropagation(rollOutNode, winCondition);
+        node = findMoveLoop(node);
       }
     } else {
       for (int i = 0; i < _iteration; i++) {
-        Node promisingNode = selection(startNode);
-        if (promisingNode == null) break;
-        Node rollOutNode = expansion(promisingNode);
-        if (rollOutNode == null) break;
-        double winCondition = rollOut(rollOutNode);
-        backPropagation(rollOutNode, winCondition);
+        node = findMoveLoop(node);
       }
     }
-
-    Node winnerNode = startNode.getChildWithMaxScore();
+    Node winnerNode = nodeWithBestMove(node);
     tree.setRoot(winnerNode);
-    return winnerNode.state.board;
+    if (debug) print("findNextMove complete");
+    return winnerNode.state.board.getLastMove();
   }
 
-  Node selection(Node node) {
-    Node promisingNode = node;
-    bool isLeafNode = promisingNode.childrenNodes == null;
-    while (isLeafNode == false) {
-      promisingNode = UCT.selectionFunction(promisingNode);
-      if (promisingNode == null) {
-        return null;
-      }
-      if (promisingNode.childrenNodes == null) {
-        isLeafNode = true;
-      }
+  Node findMoveLoop(Node startNode, {bool debug = false, int iteration}) {
+    if (debug) print(iteration);
+    Node promisingNode = selection(startNode);
+    double winCondition = promisingNode.state.board.checkWinCondition();
+
+    if (winCondition == 0) {
+      promisingNode = expansion(promisingNode);
+      winCondition = rollOut(promisingNode);
+      backPropagation(promisingNode, winCondition);
     }
+
     return promisingNode;
   }
 
-  Node expansion(Node node) {
-    Node rollOutNode;
-    if (node.state.sims == 0) {
-      rollOutNode = node;
-    } else {
-      node.generateChildrenNodes();
-      try {
-        rollOutNode = node.childrenNodes[0];
-      } on RangeError {
-        return null;
-      }
+  Node nodeWithBestMove(Node node,
+      {BestMoveType bestMoveType = BestMoveType.robust}) {
+    if (node.isFullyExplored() == false)
+      throw Exception("Not enough information to make a decision on a move");
+    return node.getChildWithBestMove(bestMoveType);
+  }
+
+  Node selection(Node node) {
+    if (node.unexploredNodes == null) {
+      node.generateUnexploredNodes();
     }
-    return rollOutNode;
+    while (node.isNotLeaf() && node.isFullyExplored()) {
+      node = UCT.selectionFunction(node);
+    }
+    return node;
+  }
+
+  Node expansion(Node node) {
+    if (node.unexploredNodes == null) {
+      node.generateUnexploredNodes();
+    }
+    if (node.state.sims == 0) {
+      return node;
+    } else {
+      Node expandedNode = node.popRandomUnexploredNode();
+      node.childrenNodes.add(expandedNode);
+      return expandedNode;
+    }
   }
 
   double rollOut(Node node) {
@@ -90,17 +95,19 @@ class MonteCarloTreeSearch {
   }
 
   void backPropagation(Node node, double winCondition) {
-    Node currentNode = node;
-    while (currentNode != null) {
+    while (node != null) {
       bool nodeWins = node.state.board.playerTurn == winCondition;
       bool nodeDraws = winCondition == 0.5;
-      if (nodeWins) {
-        node.state.wins += 1;
-      } else if (nodeDraws) {
-        node.state.wins += 0.5;
+      node.state.sims = node.state.sims + 1;
+      // * The win condition is flipped due to the fact that each node’s
+      // * statistics are used for its parent node’s choice, not its own.
+      if (nodeWins == false && nodeDraws == false) {
+        node.state.wins = node.state.wins + 1;
       }
-      node.state.sims += 1;
-      currentNode = currentNode.parent;
+      if (nodeDraws) {
+        node.state.wins = node.state.wins + 0.5;
+      }
+      node = node.parent;
     }
   }
 }
