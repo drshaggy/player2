@@ -154,12 +154,24 @@ export default function ChessGame() {
   }, []);
 
   async function handleLogin() {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    console.log("handleLogin triggered");
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) {
+        console.error("signInWithOAuth error:", error);
+        alert(`Login error: ${error.message}`);
+      } else {
+        console.log("Redirecting to:", data.url);
+      }
+    } catch (err) {
+      console.error("Login exception:", err);
+      alert(`Unexpected error: ${err}`);
+    }
   }
 
   async function handleLogout() {
