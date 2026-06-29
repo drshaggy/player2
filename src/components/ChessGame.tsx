@@ -214,7 +214,6 @@ export default function ChessGame() {
     const token = session?.access_token;
 
     if (!token) {
-      console.error("No active session token found");
       alert("Please log in to chat with the coach.");
       return;
     }
@@ -679,7 +678,7 @@ export default function ChessGame() {
           </button>
         )}
       </div>
-      <h1 className="text-4xl font-bold mb-8">Player 2: React Chess</h1>
+      <h1 className="text-4xl font-bold mb-8">Player 2: Your AI Chess Coach</h1>
       
        <div className="flex flex-col md:flex-row gap-8 items-start justify-center w-full max-w-screen-xl">
          <div className="flex flex-row gap-6 items-start justify-center w-full max-w-[300px] h-[600px] mt-[90px]">
