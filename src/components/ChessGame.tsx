@@ -101,6 +101,18 @@ export default function ChessGame() {
   const [gamePhase, setGamePhase] = useState<'consultation' | 'playing'>('consultation');
   const [sessionGoal, setSessionGoal] = useState<string>("");
 
+  function processFen(fen: string): string {
+    const fields = fen.trim().split(' ');
+    if (fields.length === 1) {
+      return `${fen.trim()} w KQkq - 0 1`;
+    } else if (fields.length < 6) {
+      const defaultFields = ['w', 'KQkq', '-', '0', '1'];
+      const padding = defaultFields.slice(fields.length - (6 - fields.length));
+      return [...fields, ...padding].join(' ');
+    }
+    return fen.trim();
+  }
+
   const userRef = useRef<any>(null);
   const opponentRef = useRef<any>(null);
   const gameIdRef = useRef<string | null>(null);
@@ -227,17 +239,8 @@ export default function ChessGame() {
 
       if (isFen && gamePhase === 'consultation') {
         console.log("FEN input detected:", trimmedInput);
-        let processedFen = trimmedInput;
+        const processedFen = processFen(trimmedInput);
         try {
-          const fields = trimmedInput.split(' ');
-          if (fields.length === 1) {
-            processedFen = `${trimmedInput} w KQkq - 0 1`;
-          } else if (fields.length < 6) {
-            const defaultFields = ['w', 'KQkq', '-', '0', '1'];
-            const padding = defaultFields.slice(fields.length - (6 - fields.length));
-            processedFen = [...fields, ...padding].join(' ');
-          }
-          
           console.log("Attempting to load processed FEN:", processedFen);
           chessGame.load(processedFen);
           if (boardInstanceRef.current) {
@@ -304,14 +307,16 @@ export default function ChessGame() {
           const aiMsg = { role: 'assistant' as const, content: data.content };
           setChatMessages(prev => [...prev, aiMsg]);
           
-          if (data.suggestedFen) {
-            chessGame.load(data.suggestedFen);
-            if (boardInstanceRef.current) {
-              boardInstanceRef.current.setPosition(data.suggestedFen);
+            if (data.suggestedFen) {
+              const processedFen = processFen(data.suggestedFen);
+              chessGame.load(processedFen);
+              if (boardInstanceRef.current) {
+                boardInstanceRef.current.setPosition(processedFen);
+              }
+              setChessPosition(processedFen);
+              updateCapturedPieces();
             }
-            setChessPosition(data.suggestedFen);
-            updateCapturedPieces();
-          }
+
 
           // If the AI indicates the consultation is complete or the user has set a goal,
           // we can transition to the 'playing' phase. 
