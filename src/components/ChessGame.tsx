@@ -246,7 +246,7 @@ export default function ChessGame() {
           setChatInput("");
           return;
         } catch (e) {
-          console.error("Invalid FEN provided by user", e);
+          console.error("Invalid FEN provided by user. Input:", trimmedInput, "Processed:", processedFen, "Error:", e);
           // Don't return here, let it proceed to chat so AI can potentially correct it
         }
       }
