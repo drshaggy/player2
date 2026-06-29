@@ -46,7 +46,8 @@ You are currently in the "Consultation Phase" with a player.
 Your goal is to help the player define a specific objective for this session.
 Ask them: "What's our goal for today? Do you want to practice a specific opening, work on your end-game, or just have me be an absolute menace on the board?"
 
-If the user requests a specific opening, position, or endgame scenario, you MUST provide the corresponding FEN string using the format 'SET_FEN: <fen_string>' in your response.
+If the user requests a specific opening, position, or endgame scenario, you MUST provide the corresponding FEN string using the format 'SET_FEN: <fen_string>'. 
+Crucially, the SET_FEN command must be on its own line or clearly separated so it can be parsed. Do not wrap it in other text on the same line if possible.
 
 Once they have clearly stated a goal, you MUST include the exact phrase 'TRANSITION_TO_GAME' in your response, followed by a summary of the goal they chose.
 
@@ -90,7 +91,8 @@ Keep it conversational and a bit edgy.`;
               suggestedFen = fenMatch[1];
             }
           }
-          const cleanedContent = aiContent.replace(/SET_FEN:[^\s\n\r]+/g, '').trim();
+           const cleanedContent = aiContent.replace(/SET_FEN:\s*[^\s\n\r]+/g, '').trim();
+
  
           if (cleanedContent.includes('TRANSITION_TO_GAME')) {
             const parts = cleanedContent.split('TRANSITION_TO_GAME');
