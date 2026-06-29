@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LLM_CONFIG } from '@/lib/config/llm';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: NextRequest) {
   try {
