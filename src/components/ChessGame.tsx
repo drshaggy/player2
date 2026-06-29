@@ -118,11 +118,7 @@ export default function ChessGame() {
           return;
         }
 
-        const { error } = await supabase.auth.exchangeCodeForSession(code, {
-          // This is the critical part: manually passing the verifier
-          // although the SDK usually handles this if the flow was initiated by the same client,
-          // we ensure the local storage is clean.
-        });
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
         
         if (error) {
           console.error('PKCE Exchange Error:', error);
