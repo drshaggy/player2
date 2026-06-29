@@ -49,7 +49,7 @@ Ask them: "What's our goal for today? Do you want to practice a specific opening
 If the user requests a specific opening, position, or endgame scenario, you MUST provide the corresponding FEN string using the format 'SET_FEN: <fen_string>'. 
 Crucially, the SET_FEN command must be on its own line or clearly separated so it can be parsed. Do not wrap it in other text on the same line if possible.
 
-Once they have clearly stated a goal, you MUST include the exact phrase 'TRANSITION_TO_GAME' in your response, followed by a summary of the goal they chose.
+Once they have clearly stated a goal (or you have suggested a position that fulfills their request), you MUST include the exact phrase 'TRANSITION_TO_GAME' in your response, followed by a summary of the goal they chose.
 
 
 Examples:
