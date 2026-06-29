@@ -1,5 +1,5 @@
 declare module 'cm-chessboard' {
-  export default class Chessboard {
+  export class Chessboard {
     constructor(element: HTMLElement, options?: any);
     setPosition(fen: string);
     setOrientation(orientation: 'white' | 'black');
