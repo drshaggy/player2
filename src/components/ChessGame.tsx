@@ -226,13 +226,23 @@ export default function ChessGame() {
 
       if (isFen && gamePhase === 'consultation') {
         try {
-          chessGame.load(trimmedInput);
-          if (boardInstanceRef.current) {
-            boardInstanceRef.current.setPosition(trimmedInput);
+          let processedFen = trimmedInput;
+          const fields = trimmedInput.split(' ');
+          if (fields.length === 1) {
+            processedFen = `${trimmedInput} w KQkq - 0 1`;
+          } else if (fields.length < 6) {
+            const defaultFields = ['w', 'KQkq', '-', '0', '1'];
+            const padding = defaultFields.slice(fields.length - 1);
+            processedFen = [...fields, ...padding].join(' ');
           }
-          setChessPosition(trimmedInput);
+
+          chessGame.load(processedFen);
+          if (boardInstanceRef.current) {
+            boardInstanceRef.current.setPosition(processedFen);
+          }
+          setChessPosition(processedFen);
           updateCapturedPieces();
-          setChatMessages(prev => [...prev, { role: 'user' as const, content: trimmedInput }, { role: 'assistant' as const, content: "Position updated! I've set the board to that FEN. What's the goal for this position?" }]);
+          setChatMessages(prev => [...prev, { role: 'user' as const, content: trimmedInput }, { role: 'assistant' as const, content: "Position updated! I've set the board. What's the goal for this position?" }]);
           setChatInput("");
           return;
         } catch (e) {
