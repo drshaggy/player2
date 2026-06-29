@@ -87,7 +87,7 @@ export default function ChessGame() {
 
   const [chessPosition, setChessPosition] = useState(chessGame.fen());
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
-  const [capturedPieces, setCapturedPieces] = useState<{ w: string[], b: string[] }>({ w: [], b: [] });
+  const [capturedPieces, setCapturedPieces] = useState<Record<string, string[]>>({ w: [], b: [] });
   const [coachCommentary, setCoachCommentary] = useState<string>("");
   const [chatMessages, setChatMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
