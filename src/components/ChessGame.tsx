@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
-import { Chessboard, COLOR, INPUT_EVENT_TYPE } from 'cm-chessboard';
+import Chessboard, { COLOR, INPUT_EVENT_TYPE } from 'cm-chessboard';
 import { Markers } from 'cm-chessboard/src/extensions/markers/Markers';
 import 'cm-chessboard/assets/chessboard.css';
 import { supabase } from '@/lib/supabase';

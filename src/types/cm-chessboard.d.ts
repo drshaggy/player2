@@ -1,5 +1,10 @@
 declare module 'cm-chessboard' {
-  export * from 'cm-chessboard/src/Chessboard';
+  export default class Chessboard {
+    constructor(element: HTMLElement, options?: any);
+    setPosition(fen: string);
+    setOrientation(orientation: 'white' | 'black');
+    // Add other methods as needed
+  }
   export const COLOR: any;
   export const INPUT_EVENT_TYPE: any;
 }
