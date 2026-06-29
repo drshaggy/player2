@@ -29,6 +29,19 @@
 - `moves`: Chronological move history linked to games.
 - **Auth**: Integrated with Supabase Auth; automatic profile creation via PG trigger.
 
+## Deployment (Vercel)
+- **Production URL**: https://player2-drab.vercel.app
+- **Required Env Vars**:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `LLM_API_KEY`
+- **Deployment Command**: `vercel --prod`
+- **Known Build Fixes**: 
+  - `cm-chessboard` requires a custom TypeScript declaration file (`src/types/cm-chessboard.d.ts`) because it lacks official types.
+  - Use named imports for `Chessboard` from `cm-chessboard`.
+  - dynamic indexing of state objects (like `capturedPieces`) requires explicit `Record<string, T>` typing to pass Vercel's build-time type checking.
+
 ## Current Progress
 - [x] Project initialized with Next.js, TS, Tailwind.
 - [x] Core chess dependencies installed.
@@ -39,3 +52,4 @@
 - [x] Implement collocated unit tests with Vitest.
 - [x] Implement iterative Opening Book lookup to support multi-turn opening goals.
 - [x] Integrate Lichess Masters Database for theory-based move suggestions.
+- [x] Deployed to Vercel and configured environment variables.
