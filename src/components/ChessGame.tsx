@@ -570,7 +570,18 @@ export default function ChessGame() {
       }
     } catch (error) {
       console.error("AI Move error:", error);
-      alert("The AI coach encountered an error while thinking. Please try again or reset the game.");
+      
+      // UNDO PLAYER MOVE: If the AI fails to respond or the API errors out, 
+      // undo the move the player just made so they aren't stuck and can try again.
+      currentChessGame.undo(); 
+      if (boardInstanceRef.current) {
+        boardInstanceRef.current.setPosition(currentChessGame.fen());
+      }
+      setChessPosition(currentChessGame.fen());
+      setMoveHistory(currentChessGame.history());
+      updateCapturedPieces();
+      
+      alert("The AI coach encountered an error while thinking. Your move has been reverted. Please try again or reset the game.");
     }
     
     if (boardInstanceRef.current) {
