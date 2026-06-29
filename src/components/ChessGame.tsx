@@ -348,7 +348,7 @@ export default function ChessGame() {
       p: 8, n: 2, b: 2, r: 2, q: 1, k: 1
     };
     
-    const counts = {
+    const counts: Record<'w' | 'b', Record<string, number>> = {
       w: { ...startingPieces },
       b: { ...startingPieces }
     };
