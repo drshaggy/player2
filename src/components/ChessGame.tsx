@@ -237,6 +237,7 @@ export default function ChessGame() {
           return;
         } catch (e) {
           console.error("Invalid FEN provided by user", e);
+          // Don't return here, let it proceed to chat so AI can potentially correct it
         }
       }
 
