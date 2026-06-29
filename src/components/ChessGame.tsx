@@ -567,26 +567,49 @@ export default function ChessGame() {
               sessionGoalRef.current = game.session_goal;
             }
           
-          chessGame.load(game.current_fen);
-          
-           setChessPosition(game.current_fen);
-           const history = chessGame.history();
-           setMoveHistory(history);
+           // Restore move history from moves table
+           const { data: moveHistoryData } = await supabase
+             .from('moves')
+             .select('move_san')
+             .eq('game_id', game.id)
+             .order('move_number', { ascending: true });
+
+           if (moveHistoryData) {
+             const sanHistory = moveHistoryData.map(m => m.move_san);
+             console.log('Replaying move history:', sanHistory);
+             
+             // Reset and replay moves to rebuild internal chess.js history
+             chessGame.reset();
+             for (const san of sanHistory) {
+               try {
+                 chessGame.move(san);
+               } catch (e) {
+                 console.error(`Failed to replay move ${san}:`, e);
+               }
+             }
+             setMoveHistory(sanHistory);
+           } else {
+             // Fallback to FEN if no moves found
+             chessGame.load(game.current_fen);
+             setMoveHistory(chessGame.history());
+           }
+           
+           setChessPosition(chessGame.fen());
            updateCapturedPieces();
 
-          // Restore chat history
-          const { data: chatHistory } = await supabase
-            .from('game_chat')
-            .select('role, content')
-            .eq('game_id', game.id)
-            .order('created_at', { ascending: true });
-          
-          if (chatHistory) {
-            setChatMessages(chatHistory.map((m: any) => ({
-              role: m.role,
-              content: m.content
-            })));
-          }
+           // Restore chat history
+           const { data: chatHistory } = await supabase
+             .from('game_chat')
+             .select('role, content')
+             .eq('game_id', game.id)
+             .order('created_at', { ascending: true });
+           
+           if (chatHistory) {
+             setChatMessages(chatHistory.map((m: any) => ({
+               role: m.role,
+               content: m.content
+             })));
+           }
 
           let attempts = 0;
           intervalId = setInterval(() => {
