@@ -218,11 +218,12 @@ export default function ChessGame() {
 
     async function handleSendMessage() {
       if (!chatInput.trim()) return;
-      console.log("handleSendMessage triggered. Input:", chatInput);
+      const trimmedInput = chatInput.trim();
+      console.log("handleSendMessage triggered. Input:", trimmedInput);
 
       // Check if message is a valid FEN string
-      const trimmedInput = chatInput.trim();
       const isFen = trimmedInput.includes('/') && (trimmedInput.length > 10);
+      console.log("isFen evaluation:", isFen);
 
       if (isFen && gamePhase === 'consultation') {
         console.log("FEN input detected:", trimmedInput);
