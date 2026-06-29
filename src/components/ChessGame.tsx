@@ -89,14 +89,16 @@ export default function ChessGame() {
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [capturedPieces, setCapturedPieces] = useState<Record<string, string[]>>({ w: [], b: [] });
   const [coachCommentary, setCoachCommentary] = useState<string>("");
-  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
+  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([
+    { role: 'assistant', content: "Welcome! Before we start this session, tell me: what's our goal for today? Do you want to practice a specific opening, work on your end-game, or just have me be an absolute menace on the board?" }
+  ]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [chatInput, setChatInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [opponent, setOpponent] = useState<any>(null);
   const [gameId, setGameId] = useState<string | null>(null);
-  const [gamePhase, setGamePhase] = useState<'consultation' | 'playing'>('playing');
+  const [gamePhase, setGamePhase] = useState<'consultation' | 'playing'>('consultation');
   const [sessionGoal, setSessionGoal] = useState<string>("");
 
   const userRef = useRef<any>(null);
@@ -285,7 +287,10 @@ export default function ChessGame() {
           }
         }
       } else {
-        if (!gameIdRef.current) return;
+        if (!gameIdRef.current) {
+          console.warn('No gameId found for AI move');
+          return;
+        }
 
         if (chessGameRef.current.turn() === 'b') {
           await makeAIMove();
@@ -551,21 +556,23 @@ export default function ChessGame() {
 
         const game = games?.[0];
 
-        if (game) {
-          console.log('Found active game:', game.id, 'with FEN:', game.current_fen);
-          setGameId(game.id);
-          gameIdRef.current = game.id;
-          
-          if (game.session_goal) {
-            setSessionGoal(game.session_goal);
-            sessionGoalRef.current = game.session_goal;
-          }
+          if (game) {
+            console.log('Found active game:', game.id, 'with FEN:', game.current_fen);
+            setGameId(game.id);
+            gameIdRef.current = game.id;
+            setGamePhase('playing');
+            
+            if (game.session_goal) {
+              setSessionGoal(game.session_goal);
+              sessionGoalRef.current = game.session_goal;
+            }
           
           chessGame.load(game.current_fen);
           
-          setChessPosition(game.current_fen);
-          setMoveHistory(chessGame.history());
-          updateCapturedPieces();
+           setChessPosition(game.current_fen);
+           const history = chessGame.history();
+           setMoveHistory(history);
+           updateCapturedPieces();
 
           // Restore chat history
           const { data: chatHistory } = await supabase
