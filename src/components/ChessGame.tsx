@@ -107,28 +107,30 @@ export default function ChessGame() {
   const sessionGoalRef = useRef<string>("");
 
   useEffect(() => {
-    async function handlePkceExchange() {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
+    async function handleImplicitAuth() {
+      // Implicit flow puts tokens in the URL fragment (#)
+      const fragment = window.location.hash;
+      if (fragment.includes('access_token=')) {
+        const params = new URLSearchParams(fragment.substring(1));
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
 
-      if (code) {
-        const verifier = localStorage.getItem('sb-pkce-verifier');
-        if (!verifier) {
-          console.error('PKCE verifier not found in localStorage');
-          return;
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          
+          if (error) {
+            console.error('Manual session set error:', error);
+          }
+          // Clean up the URL
+          window.history.replaceState({}, document.title, window.location.pathname);
         }
-
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        
-        if (error) {
-          console.error('PKCE Exchange Error:', error);
-        }
-        localStorage.removeItem('sb-pkce-verifier');
-        window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
 
-    handlePkceExchange();
+    handleImplicitAuth();
 
     // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -147,6 +149,7 @@ export default function ChessGame() {
     return () => subscription.unsubscribe();
   }, []);
 
+
   useEffect(() => {
     async function fetchCoach() {
       const { data } = await supabase
@@ -161,38 +164,16 @@ export default function ChessGame() {
   }, []);
 
   async function handleLogin() {
-    console.log("handleLogin triggered");
     try {
-      // Manually generate PKCE verifier and challenge to avoid @supabase/ssr encoding bugs
-      const array = new Uint8Array(32);
-      window.crypto.getRandomValues(array);
-      const verifier = btoa(String.fromCharCode(...array))
-        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      
-      localStorage.setItem('sb-pkce-verifier', verifier);
-
-      const encoder = new TextEncoder();
-      const data = encoder.encode(verifier);
-      const hash = await window.crypto.subtle.digest('SHA-256', data);
-      const challenge = btoa(String.fromCharCode(...new Uint8Array(hash)))
-        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-      const { data: authData, error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            code_challenge: challenge,
-            code_challenge_method: 'S256',
-          },
+          redirectTo: window.location.origin,
         },
       });
-
       if (error) {
         console.error("signInWithOAuth error:", error);
         alert(`Login error: ${error.message}`);
-      } else {
-        console.log("Redirecting to:", authData.url);
       }
     } catch (err) {
       console.error("Login exception:", err);
