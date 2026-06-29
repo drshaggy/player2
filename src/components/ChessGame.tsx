@@ -341,7 +341,7 @@ export default function ChessGame() {
 
   function updateCapturedPieces() {
     const currentFen = chessGame.fen();
-    const pieces = { w: [], b: [] };
+    const pieces: Record<'w' | 'b', string[]> = { w: [], b: [] };
     
     // Initial pieces for each color
     const startingPieces = {
