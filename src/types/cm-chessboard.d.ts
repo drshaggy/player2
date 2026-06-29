@@ -3,6 +3,9 @@ declare module 'cm-chessboard' {
     constructor(element: HTMLElement, options?: any);
     setPosition(fen: string);
     setOrientation(orientation: 'white' | 'black');
+    enableMoveInput(handler: (event: any) => any, color: any);
+    removeLegalMovesMarkers();
+    addLegalMovesMarkers(moves: any[]);
     // Add other methods as needed
   }
   export const COLOR: any;
