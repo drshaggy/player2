@@ -45,7 +45,11 @@ export async function POST(req: NextRequest) {
 You are currently in the "Consultation Phase" with a player. 
 Your goal is to help the player define a specific objective for this session.
 Ask them: "What's our goal for today? Do you want to practice a specific opening, work on your end-game, or just have me be an absolute menace on the board?"
+
+If the user requests a specific opening, position, or endgame scenario, you MUST provide the corresponding FEN string using the format 'SET_FEN: <fen_string>' in your response.
+
 Once they have clearly stated a goal, you MUST include the exact phrase 'TRANSITION_TO_GAME' in your response, followed by a summary of the goal they chose.
+
 
 Examples:
 - "That sounds great! Let's focus on the Sicilian Defense. TRANSITION_TO_GAME Goal: Practice Sicilian Defense"
@@ -76,23 +80,36 @@ Keep it conversational and a bit edgy.`;
            return NextResponse.json({ error: `LLM API failed with status ${llmResponse.status}: ${errorText}` }, { status: 500 });
          }
 
-         const llmData = await llmResponse.json();
-         const aiContent = llmData.choices[0].message.content;
-
-         if (aiContent.includes('TRANSITION_TO_GAME')) {
-           const parts = aiContent.split('TRANSITION_TO_GAME');
-           const cleanedContent = parts[0].trim();
-           const goalPart = parts[1] || '';
-           const sessionGoal = goalPart.replace(/Goal:/i, '').trim();
-
-           return NextResponse.json({ 
-             content: cleanedContent, 
-             transitionToGame: true, 
-             sessionGoal: sessionGoal 
-           });
-         }
-
-         return NextResponse.json({ content: aiContent });
+          const llmData = await llmResponse.json();
+          const aiContent = llmData.choices[0].message.content;
+ 
+          let suggestedFen = null;
+          if (aiContent.includes('SET_FEN:')) {
+            const fenMatch = aiContent.match(/SET_FEN:\s*([^\s\n\r]+)/);
+            if (fenMatch) {
+              suggestedFen = fenMatch[1];
+            }
+          }
+          const cleanedContent = aiContent.replace(/SET_FEN:[^\s\n\r]+/g, '').trim();
+ 
+          if (cleanedContent.includes('TRANSITION_TO_GAME')) {
+            const parts = cleanedContent.split('TRANSITION_TO_GAME');
+            const finalContent = parts[0].trim();
+            const goalPart = parts[1] || '';
+            const sessionGoal = goalPart.replace(/Goal:/i, '').trim();
+ 
+            return NextResponse.json({ 
+              content: finalContent, 
+              transitionToGame: true, 
+              sessionGoal: sessionGoal,
+              suggestedFen: suggestedFen
+            });
+          }
+ 
+          return NextResponse.json({ 
+            content: cleanedContent, 
+            suggestedFen: suggestedFen 
+          });
       }
 
       // 4. Standard Game Chat Phase

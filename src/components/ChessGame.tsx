@@ -216,20 +216,42 @@ export default function ChessGame() {
       .eq('id', currentGameId);
   }
 
-  async function handleSendMessage() {
-    if (!chatInput.trim()) return;
+    async function handleSendMessage() {
+      if (!chatInput.trim()) return;
 
-    // 1. Get the current session token for the API request
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+      // Check if message is a valid FEN string
+      const trimmedInput = chatInput.trim();
+      const isFen = /^[rnbqkbnr\/[0-9]{1,8}\/[rnbqkbnr\/[0-9]{1,8}\/[rnbqkbnr\/[0-9]{1,8}\/[rnbqkbnr\/[0-9]{1,8}\/[rnbqkbnr\/[0-9]{1,8}\/[rnbqkbnr\/[0-9]{1,8}\/[rnbqkbnr\/[0-9]{1,8}\/[rnbqkbnr\/[0-9]{1,8}]\s[wb]\s[kq]\s[kq]\s[0-9]\s[0-9]$/.test(trimmedInput) 
+                   || (trimmedInput.split(' ').length === 1 && trimmedInput.includes('/'));
 
-    if (!token) {
-      alert("Please log in to chat with the coach.");
-      return;
-    }
+      if (isFen && gamePhase === 'consultation') {
+        try {
+          chessGame.load(trimmedInput);
+          if (boardInstanceRef.current) {
+            boardInstanceRef.current.setPosition(trimmedInput);
+          }
+          setChessPosition(trimmedInput);
+          updateCapturedPieces();
+          setChatMessages(prev => [...prev, { role: 'user' as const, content: trimmedInput }, { role: 'assistant' as const, content: "Position updated! I've set the board to that FEN. What's the goal for this position?" }]);
+          setChatInput("");
+          return;
+        } catch (e) {
+          console.error("Invalid FEN provided by user", e);
+        }
+      }
 
-    const message = chatInput.trim();
-    setChatInput("");
+      // 1. Get the current session token for the API request
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        alert("Please log in to chat with the coach.");
+        return;
+      }
+
+      const message = trimmedInput;
+      setChatInput("");
+
     
     const userMsg = { role: 'user' as const, content: message };
     setChatMessages(prev => [...prev, userMsg]);
@@ -264,6 +286,15 @@ export default function ChessGame() {
           const aiMsg = { role: 'assistant' as const, content: data.content };
           setChatMessages(prev => [...prev, aiMsg]);
           
+          if (data.suggestedFen) {
+            chessGame.load(data.suggestedFen);
+            if (boardInstanceRef.current) {
+              boardInstanceRef.current.setPosition(data.suggestedFen);
+            }
+            setChessPosition(data.suggestedFen);
+            updateCapturedPieces();
+          }
+
           // If the AI indicates the consultation is complete or the user has set a goal,
           // we can transition to the 'playing' phase. 
           // For now, we'll let the coach decide or look for a signal in the response.
