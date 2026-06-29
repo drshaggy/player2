@@ -129,7 +129,19 @@ export async function POST(req: NextRequest) {
     // Sanitize response in case LLM ignores "no markdown" instruction
     content = content.replace(/```json\n?/, '').replace(/```$/, '').trim();
 
-    const result = JSON.parse(content);
+    let result;
+    try {
+      result = JSON.parse(content);
+    } catch (e) {
+      console.error('Failed to parse LLM JSON response:', content);
+      throw new Error('LLM returned invalid JSON');
+    }
+
+    if (!result || typeof result.selectedMoveIndex !== 'number') {
+      console.error('LLM response missing selectedMoveIndex:', result);
+      throw new Error('LLM response missing selectedMoveIndex');
+    }
+
     const chosenCandidate = processedCandidates[result.selectedMoveIndex - 1] || processedCandidates[0];
 
     return NextResponse.json({

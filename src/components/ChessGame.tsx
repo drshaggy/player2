@@ -516,10 +516,7 @@ export default function ChessGame() {
       }
     } catch (error) {
       console.error("AI Move error:", error);
-      const possibleMoves = currentChessGame.moves();
-      const randomMoveSan = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-      const move = currentChessGame.move(randomMoveSan);
-      if (move) await saveGameMove(move);
+      alert("The AI coach encountered an error while thinking. Please try again or reset the game.");
     }
     
     if (boardInstanceRef.current) {

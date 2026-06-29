@@ -14,7 +14,7 @@ State: ${semanticState}
 FEN: ${fen}
 
 Current Stockfish Candidate Moves (The ONLY moves you can choose from):
-${processedCandidates.map((c, i) => `${i+1}. ${c.move} (Score: ${c.score}, Depth: ${c.depth})`).join('\\n')}
+${processedCandidates.map((c, i) => `${i+1}. ${c.move} (Score: ${c.score}, Depth: ${c.depth})`).join('\n')}
 
 Opening Book Options Reference:
 ${Array.isArray(openingContext) 
