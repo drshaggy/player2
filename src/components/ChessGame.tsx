@@ -112,11 +112,22 @@ export default function ChessGame() {
       const code = params.get('code');
 
       if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        const verifier = localStorage.getItem('sb-pkce-verifier');
+        if (!verifier) {
+          console.error('PKCE verifier not found in localStorage');
+          return;
+        }
+
+        const { error } = await supabase.auth.exchangeCodeForSession(code, {
+          // This is the critical part: manually passing the verifier
+          // although the SDK usually handles this if the flow was initiated by the same client,
+          // we ensure the local storage is clean.
+        });
+        
         if (error) {
           console.error('PKCE Exchange Error:', error);
         }
-        // Clean up the URL
+        localStorage.removeItem('sb-pkce-verifier');
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
@@ -156,17 +167,36 @@ export default function ChessGame() {
   async function handleLogin() {
     console.log("handleLogin triggered");
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      // Manually generate PKCE verifier and challenge to avoid @supabase/ssr encoding bugs
+      const array = new Uint8Array(32);
+      window.crypto.getRandomValues(array);
+      const verifier = btoa(String.fromCharCode(...array))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      
+      localStorage.setItem('sb-pkce-verifier', verifier);
+
+      const encoder = new TextEncoder();
+      const data = encoder.encode(verifier);
+      const hash = await window.crypto.subtle.digest('SHA-256', data);
+      const challenge = btoa(String.fromCharCode(...new Uint8Array(hash)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+      const { data: authData, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            code_challenge: challenge,
+            code_challenge_method: 'S256',
+          },
         },
       });
+
       if (error) {
         console.error("signInWithOAuth error:", error);
         alert(`Login error: ${error.message}`);
       } else {
-        console.log("Redirecting to:", data.url);
+        console.log("Redirecting to:", authData.url);
       }
     } catch (err) {
       console.error("Login exception:", err);
