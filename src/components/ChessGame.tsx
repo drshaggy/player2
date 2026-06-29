@@ -225,8 +225,8 @@ export default function ChessGame() {
                    || (trimmedInput.split(' ').length === 1 && trimmedInput.includes('/'));
 
       if (isFen && gamePhase === 'consultation') {
+        let processedFen = trimmedInput;
         try {
-          let processedFen = trimmedInput;
           const fields = trimmedInput.split(' ');
           if (fields.length === 1) {
             processedFen = `${trimmedInput} w KQkq - 0 1`;
