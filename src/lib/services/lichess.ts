@@ -37,11 +37,20 @@ export async function getMasterOpeningMoves(play: string, movesLimit = 5): Promi
   const url = `https://explorer.lichess.org/masters?play=${play}&moves=${movesLimit}`;
   
   try {
-    const response = await fetch(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
     if (!response.ok) throw new Error(`Lichess API error: ${response.statusText}`);
     
     const data: LichessOpeningResponse = await response.json();
     
+    if (!data || !Array.isArray(data.moves)) {
+      return [];
+    }
+
     return data.moves.map(m => ({
       uci: m.uci,
       san: m.san,
