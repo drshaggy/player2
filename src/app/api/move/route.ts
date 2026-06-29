@@ -54,6 +54,10 @@ export async function POST(req: NextRequest) {
       console.error('Lichess integration failed:', e);
     }
 
+    console.log('--- [DEBUG] Post-Lichess State ---');
+    console.log('processedCandidates length:', processedCandidates.length);
+    console.log('openingContext length:', openingContext?.length);
+
     // Ensure opening book moves that might match the goal are included as candidates
     if (Array.isArray(openingContext)) {
 
@@ -105,19 +109,26 @@ export async function POST(req: NextRequest) {
     console.log('Final Messages:', JSON.stringify(llmMessages, null, 2));
     console.log('--- [DEBUG] API_MOVE PROMPT END ---');
 
+    console.log('Calling LLM at endpoint:', LLM_CONFIG.endpoint);
     const llmResponse = await fetch(LLM_CONFIG.endpoint, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
       },
-         body: JSON.stringify({
-           model: LLM_CONFIG.model,
-           messages: llmMessages,
-           response_format: { type: 'json_object' },
-         }),
-
+      body: JSON.stringify({
+        model: LLM_CONFIG.model,
+        messages: llmMessages,
+        response_format: { type: 'json_object' },
+      }),
     });
+
+    console.log('LLM Response status:', llmResponse.status);
+    if (!llmResponse.ok) {
+      const errorText = await llmResponse.text();
+      console.error('LLM API error response:', errorText);
+      throw new Error(`LLM API failed with status ${llmResponse.status}: ${errorText}`);
+    }
 
     const llmData = await llmResponse.json();
     
