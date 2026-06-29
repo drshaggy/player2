@@ -107,31 +107,6 @@ export default function ChessGame() {
   const sessionGoalRef = useRef<string>("");
 
   useEffect(() => {
-    async function handleImplicitAuth() {
-      // Implicit flow puts tokens in the URL fragment (#)
-      const fragment = window.location.hash;
-      if (fragment.includes('access_token=')) {
-        const params = new URLSearchParams(fragment.substring(1));
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-
-        if (accessToken && refreshToken) {
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          
-          if (error) {
-            console.error('Manual session set error:', error);
-          }
-          // Clean up the URL
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-      }
-    }
-
-    handleImplicitAuth();
-
     // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null;
