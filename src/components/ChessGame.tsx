@@ -107,6 +107,22 @@ export default function ChessGame() {
   const sessionGoalRef = useRef<string>("");
 
   useEffect(() => {
+    async function handlePkceExchange() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error('PKCE Exchange Error:', error);
+        }
+        // Clean up the URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+
+    handlePkceExchange();
+
     // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null;

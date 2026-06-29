@@ -1,5 +1,3 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
@@ -7,29 +5,8 @@ export async function GET(request: Request) {
   const code = searchParams.get('code');
 
   if (code) {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          },
-        },
-      }
-    );
-
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) {
-      console.error('Exchange code error:', error);
-      return NextResponse.redirect(`${origin}/auth/auth-error?msg=${encodeURIComponent(error.message)}`);
-    }
+    // Simply redirect back to home and let the browser client handle the exchange
+    return NextResponse.redirect(`${origin}/?code=${encodeURIComponent(code)}`);
   }
 
   return NextResponse.redirect(`${origin}/`);
