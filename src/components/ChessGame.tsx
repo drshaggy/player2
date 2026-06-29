@@ -225,6 +225,7 @@ export default function ChessGame() {
                    || (trimmedInput.split(' ').length === 1 && trimmedInput.includes('/'));
 
       if (isFen && gamePhase === 'consultation') {
+        console.log("FEN input detected:", trimmedInput);
         let processedFen = trimmedInput;
         try {
           const fields = trimmedInput.split(' ');
@@ -232,10 +233,11 @@ export default function ChessGame() {
             processedFen = `${trimmedInput} w KQkq - 0 1`;
           } else if (fields.length < 6) {
             const defaultFields = ['w', 'KQkq', '-', '0', '1'];
-            const padding = defaultFields.slice(fields.length - 1);
+            const padding = defaultFields.slice(fields.length - (6 - fields.length));
             processedFen = [...fields, ...padding].join(' ');
           }
-
+          
+          console.log("Attempting to load processed FEN:", processedFen);
           chessGame.load(processedFen);
           if (boardInstanceRef.current) {
             boardInstanceRef.current.setPosition(processedFen);
@@ -246,8 +248,12 @@ export default function ChessGame() {
           setChatInput("");
           return;
         } catch (e) {
-          console.error("Invalid FEN provided by user. Input:", trimmedInput, "Processed:", processedFen, "Error:", e);
-          // Don't return here, let it proceed to chat so AI can potentially correct it
+          console.error("CRITICAL FEN ERROR:", {
+            input: trimmedInput,
+            processed: processedFen,
+            error: e
+          });
+          // Let it proceed to chat
         }
       }
 
