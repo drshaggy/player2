@@ -3,10 +3,24 @@
 ## Documentation
 - **AGENTS.md** - Update this file with commands and rules specific to this project
 - **ARCHITECTURE.md**
-- **ENGINEERING_PLAN.md** - Architecture, testing harness, and deployment strategy (Phases 1-3 complete; Phase 4 in progress)
+- **ENGINEERING_PLAN.md** - Architecture, testing harness, and deployment strategy (Phases 1-5 complete)
 - **DYNAMIC_FEN_PLAN.md**
 - **Update all Docs**  - When asked to update all docs, all .md files
 - Add new md files to this list so you know to read them
+
+## Resume State (UNCOMMITTED WORK — read first)
+There is **uncommitted work** in the working tree from Phase 5 step 18 (`ChessGame.tsx` hook extraction). `git status` shows:
+- **New:** `src/hooks/useChessGame.ts`, `src/hooks/useCoachChat.ts`, `src/hooks/useGamePersistence.ts`, `src/lib/utils/boardInput.ts`, `src/lib/utils/chess.test.ts`
+- **Modified:** `src/components/ChessGame.tsx` (657 → 135 lines), `src/lib/utils/chess.ts` (+`computeCapturedPieces`), `AGENTS.md`, `ARCHITECTURE.md`, `ENGINEERING_PLAN.md`
+
+`npm run verify` passes (typecheck + lint + 81 tests across 14 files) and `npm run build` succeeds. Behavior was preserved by moving code blocks verbatim into hooks.
+
+**PENDING — E2E gate not yet run.** The extraction touched a Dangerous-zone file (`ChessGame.tsx`). Docker was previously down on this machine; the user is bringing it up. Before committing, run:
+```
+npm run db:reset && npm run test:e2e
+```
+If E2E passes, commit the work (user has not yet authorized a commit — ask first). If E2E fails, fix the root cause in the hook files; do not weaken the E2E assertions. After the commit lands, delete this "Resume State" section.
+
 
 ## Project Setup
 - **Project Path**: `/Users/connor/Repos/cerebras-hackathon/player2`
@@ -44,6 +58,14 @@ Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix 
 - E2E tests live in `tests/e2e/` and run against local Supabase only. They are excluded from vitest.
 - Never mock the module under test — mock at the boundaries (fetch, external services).
 
+## Safe-to-touch vs. Dangerous Zones
+- **Safe (iterate freely):** `src/lib/**`, `src/components/**` (presentational components are decomposed), `src/hooks/**`, `supabase/migrations/**`, tests, fixtures, prompts.
+- **Dangerous (flag for human review before changing):**
+  - RLS policies — source of truth is `supabase/migrations/20260629100103_rls_policies.sql`. Do not edit the `supabase/rls.sql` reference copy as the canonical policy set.
+  - `next.config.ts`, `vercel.json`, Vercel project config, env var wiring.
+  - `supabase/config.toml` (local stack config).
+- **Component size rule:** No component file should exceed ~250 lines. If it does, extract a hook or a child component. (See ENGINEERING_PLAN §2.1.)
+
 ## Tooling
 - **CLI Tools Available**: `vercel`, `cloudflare`, `gh`, `vitest`
 - When unit tests fail, ALWAYS fix the root cause. Never skip the failing test, or coerce the test to pass. Never change the test, escalate to the user if it is genuinely broken.
@@ -70,13 +92,13 @@ Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix 
 - **Known Build Fixes**: 
   - `src/app/page.tsx` uses `export const dynamic = 'force-dynamic'` because `ChessGame` eagerly creates a Supabase client at module load.
   - `cm-chessboard` requires a custom TypeScript declaration file (`src/types/cm-chessboard.d.ts`).
-  - `ChessGame.tsx` has a scoped `eslint-disable` for `any`/`exhaustive-deps`/`react-hooks/refs` — to be cleaned up when the remaining game logic is extracted into hooks (deferred).
+  - `ChessGame.tsx` has a scoped `eslint-disable` for `react-hooks/refs` (the `applyRestoredStateRef` latest-callback pattern). The hook files have scoped `eslint-disable`s for `any`/`exhaustive-deps`/`refs` where cm-chessboard's untyped event handlers and the latest-callback ref pattern require them.
 
-## Architecture Summary (post-Phase 2)
-- `ChessGame.tsx` (657 lines) is the orchestrator: game state, AI move loop, persistence, chat, restoration. Further extraction into `useChessGame` / `useCoachChat` / `useGamePersistence` hooks is deferred.
+## Architecture Summary (post-Phase 5)
+- `ChessGame.tsx` (135 lines) is now a thin orchestrator: owns the shared refs (`chessGameRef`, `boardInstanceRef`, `boardRef`, `sessionGoalRef`) and wires the hooks. The remaining `any`/`react-hooks/refs` disables are scoped to the hook files where cm-chessboard's untyped event handlers and the latest-callback ref pattern require them.
+- Hooks extracted: `useAuth`, `useChessGame` (board state, AI move loop, board init), `useCoachChat` (chat, consultation phase, `/api/chat`), `useGamePersistence` (gameId, opponent, saveGameMove, createGame, restoreGame effect).
 - Presentational components extracted: `Board`, `ChatPanel`, `MoveHistory`, `AuthBadge`.
-- `useAuth` hook extracted.
-- Pure helpers in `src/lib/utils/chess.ts` (`getPieceImage`, `processFen`).
+- Pure helpers in `src/lib/utils/chess.ts` (`getPieceImage`, `processFen`, `computeCapturedPieces`) and `src/lib/utils/boardInput.ts` (`handleChessInput`, cm-chessboard move-input handler).
 - AI pipeline: opening book → Lichess masters → Stockfish candidates → LLM pick (with 422 on bad index, no silent fallback).
 - `generateSemanticState` is real (phase detection + material balance), not a stub.
 - Move pipeline extracted to `src/lib/pipeline/movePipeline.ts` (`runMovePipeline`); `/api/move/route.ts` is a thin NextResponse adapter. Scenario tests in `src/lib/pipeline/scenarios/` + `movePipeline.test.ts`.
@@ -99,4 +121,6 @@ Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix 
 - [x] ENGINEERING_PLAN Phase 2 — Architecture (real `generateSemanticState`, persona cleanup, 422 on bad index, decomposed `ChessGame.tsx`).
 - [x] Unblocked local dev + production build (`.env.local` fix, `force-dynamic`).
 - [x] ENGINEERING_PLAN Phase 3 — Testing harness (fixtures, scenario pipeline extracted from route, component tests, Playwright E2E).
-- [ ] ENGINEERING_PLAN Phase 4 — Deployment isolation (staging Supabase, seed, PR template).
+- [x] ENGINEERING_PLAN Phase 4 — Deployment isolation (`.env.example` tiers, seed.sql, PR template). Staging backend (step 15) deferred indefinitely — develop against local Supabase.
+- [x] ENGINEERING_PLAN Phase 5 — Agent enablement audit (added Safe-to-touch vs. Dangerous Zones, surfaced 250-line component rule in AGENTS.md).
+- [x] Extract `useChessGame` / `useCoachChat` / `useGamePersistence` hooks from `ChessGame.tsx` (657 → 135 lines; all extracted files under the 250-line rule).

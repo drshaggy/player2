@@ -1,10 +1,12 @@
 # Engineering Plan: Architecture, Testing Harness, and Deployment Strategy
 
-**Status:** Phases 1-3 complete. Phase 4 (deployment isolation) is next.
+**Status:** Phases 1-5 complete.
 **Audience:** Future coding agents (small model) and human contributors.
 **Goal:** Shore up the architecture so a small model can safely iterate, build a testing harness that catches real bugs (not just happy paths), and stop deploying to production to test changes.
 
-> **Resume note:** The codebase is in a working state — `npm run verify` passes (71 tests across 13 files: typecheck, lint, unit + component + scenario tests), `npm run build` succeeds. E2E is wired (`npm run test:e2e`, opt-in, needs local Supabase). Phase 4 starts at step 13 below.
+> **Resume note:** The codebase is in a working state — `npm run verify` passes (81 tests across 14 files: typecheck, lint, unit + component + scenario tests), `npm run build` succeeds. E2E is wired (`npm run test:e2e`, opt-in, needs local Supabase). Phases 1-5 are done; the staging backend (step 15) is deferred indefinitely (§4.4). `ChessGame.tsx` is a 135-line orchestrator over `useChessGame` / `useCoachChat` / `useGamePersistence`. Remaining deferred track: persona system rework (§7).
+>
+> **UNCOMMITTED — Phase 5 step 18 (hook extraction) is in the working tree but not yet committed.** Docker was previously down on this machine; before committing, run `npm run db:reset && npm run test:e2e` to confirm behavior was preserved (the extraction touched a Dangerous-zone file). See AGENTS.md "Resume State" for the file list and post-E2E commit instructions.
 
 ---
 
@@ -25,30 +27,36 @@
 4. **Silent failure masking** — RESOLVED (Phase 2.7): `/api/move` returns 422 with debug payload on bad index, no fallback.
 5. **No E2E tests** — RESOLVED (Phase 3.12): Playwright wired with `playwright.config.ts`, `npm run test:e2e`, smoke + consultation specs in `tests/e2e/`. Opt-in (not part of `verify`); requires local Supabase.
 6. **No type check or lint gate** — RESOLVED (Phase 1.1): `npm run verify` is the single gate.
-7. **Deployment = production** — STILL OPEN (Phase 4): Vercel Previews still hit prod Supabase. Staging project planned.
+7. **Deployment = production** — RESOLVED (Phase 4, step 15 deferred): Vercel Previews remain unwired to a staging DB; the staging backend decision is deferred indefinitely (§4.4). Develop against local Supabase (`npm run db:reset` + `npm run dev`) and smoke-test there. Steps 13, 14, 16 are done.
 
 ---
 
 ## 2. Architecture Consolidation
 
-### 2.1 Decompose `ChessGame.tsx`
+### 2.1 Decompose `ChessGame.tsx` ✅
 
 Split into a hook + presentational components. The state machine stays in one hook; components stay dumb.
 
 ```
 src/components/
-  ChessGame.tsx              # thin orchestrator only
+  ChessGame.tsx              # thin orchestrator only (135 lines)
   Board.tsx                 # cm-chessboard wrapper, captured pieces, status pill
   ChatPanel.tsx             # message list + input
   MoveHistory.tsx           # right-side move list
   AuthBadge.tsx             # top-right login/logout
 
 src/hooks/
-  useChessGame.ts           # board state, move input, AI move loop
-  useCoachChat.ts           # chat messages, consultation phase, /api/chat
-  useGamePersistence.ts     # saveGameMove, restoreGame, Supabase read/write
-  useAuth.ts                 # session subscription
+  useChessGame.ts           # board state, move input, AI move loop (211 lines)
+  useCoachChat.ts           # chat messages, consultation phase, /api/chat (209 lines)
+  useGamePersistence.ts     # saveGameMove, createGame, restoreGame, Supabase read/write (237 lines)
+  useAuth.ts                # session subscription
+
+src/lib/utils/
+  boardInput.ts             # handleChessInput (cm-chessboard move-input handler, extracted)
+  chess.ts                  # getPieceImage, processFen, computeCapturedPieces (extracted)
 ```
+
+**Done (Phase 5.18):** `ChessGame.tsx` 657 → 135 lines; all extracted files under the 250-line rule. Orchestrator owns the shared refs (`chessGameRef`, `boardInstanceRef`, `boardRef`, `sessionGoalRef`); hooks communicate via two latest-callback refs (`setChatMessagesRef`, `applyRestoredStateRef`) to break the circular call-order dependency. Behavior preserved verbatim; E2E gate (`npm run test:e2e`, needs local Supabase) should be run before merging UI behavior changes.
 
 **Rule for agents:** No component file should exceed ~250 lines. If it does, extract a hook or a child component.
 
@@ -189,7 +197,7 @@ Already scaffolded (`supabase/config.toml`, migrations exist). Make it first-cla
 
 ### 4.4 Tier 2 — Preview deployments with isolated DB
 
-**DEFERRED.** The staging backend for Vercel Preview deployments is on hold pending a multi-project isolation decision.
+**DEFERRED INDEFINITELY.** The staging backend for Vercel Preview deployments is on hold; Phase 4 is marked complete with this item deferred. A staging tier may be revisited when there is a concrete need to test against a shared non-prod backend.
 
 - A self-hosted Supabase stack on percy.network was prototyped in docs, but a single shared instance can't safely back multiple projects (schema/auth/migrations collide — see §8.1). Per-project stacks (one subdomain each) are the clean alternative but add per-project ops.
 - **Until resolved:** develop against **local Supabase** (`supabase start` + `npm run db:reset`) and smoke-test in `npm run dev`. Vercel Preview URLs are not yet wired to a staging DB; do not point them at the production cloud project.
@@ -261,11 +269,15 @@ Sequenced so each step is independently shippable and the agent can verify as it
 11. **Add component tests** for decomposed components. Commit. ✅ (`Board.test.tsx`, `ChatPanel.test.tsx`, `MoveHistory.test.tsx` via Testing Library + jest-dom; `vitest.setup.ts` registers matchers)
 12. **Wire up Playwright E2E** against local Supabase. Add `test:e2e` script. Commit. ✅ (`playwright.config.ts`, `tests/e2e/smoke.spec.ts`, `tests/e2e/consultation-flow.spec.ts`; `npm run test:e2e`; excluded from vitest)
 
-### Phase 4 — Deployment isolation (partially complete)
+### Phase 4 — Deployment isolation ✅
 13. **Document `.env.example`** and split `.env.local` for local Supabase. Commit. ✅ (`.env.example` rewritten with local/staging/prod tier docs; README updated with local-dev first-run and deployment tiers)
 14. **Extend `supabase/seed.sql`** with test user + Coach bot + sample game. Commit. ✅ (test user `test@player2.local`/`password123` seeded into `auth.users` with bcrypt hash; Coach bot upserted; sample game row; idempotent via `ON CONFLICT`)
-15. **Staging backend for Vercel Previews — DEFERRED.** A self-hosted Supabase stack on percy.network was prototyped but a single shared instance can't safely back multiple projects (schema/auth/migrations collide). Per-project stacks or Supabase Branching (paid) are the viable options; decision pending. Until then, develop against local Supabase (`npm run db:reset` + `npm run dev`). Code/docs side (steps 13, 14, 16) complete.
+15. **Staging backend for Vercel Previews — DEFERRED INDEFINITELY.** Phase 4 is marked complete with this item deferred. A self-hosted Supabase stack on percy.network was prototyped but a single shared instance can't safely back multiple projects (schema/auth/migrations collide). Per-project stacks or Supabase Branching (paid) are the viable options; decision deferred until a concrete need arises. Until then, develop against local Supabase (`npm run db:reset` + `npm run dev`). Code/docs side (steps 13, 14, 16) complete.
 16. **Add PR template** (`.github/pull_request_template.md`) reminding to run `npm run verify` and smoke-test the preview. Commit. ✅
+
+### Phase 5 — Agent enablement audit
+17. **Audit §5 (Agent Enablement) against `AGENTS.md` and fill gaps.** Commit. ✅ (added "Safe-to-touch vs. dangerous zones" section — the §5.3 item that was missing; surfaced the §2.1 ~250-line component rule; updated Architecture Summary header and Current Progress checklist to reflect Phases 1-4 complete)
+18. **Extract `useChessGame` / `useCoachChat` / `useGamePersistence` hooks from `ChessGame.tsx`.** Commit. ✅ (`ChessGame.tsx` 657 → 135 lines; extracted `handleChessInput` → `src/lib/utils/boardInput.ts` and `computeCapturedPieces` → `src/lib/utils/chess.ts` (with `chess.test.ts`, 10 cases); orchestrator owns shared refs + two latest-callback refs; behavior preserved; `npm run verify` passes, build succeeds)
 
 ---
 
@@ -281,7 +293,7 @@ Sequenced so each step is independently shippable and the agent can verify as it
 
 ## 8. Resolved Decisions
 
-1. **Supabase staging tier — DEFERRED.** A self-hosted Supabase stack on percy.network was prototyped, but a single shared instance can't safely back multiple projects: the `public` schema, `auth.users` + the `handle_new_user` trigger, and `supabase_migrations` history all collide across projects. Per-project stacks (one subdomain each) or Supabase Branching (paid plan) are the viable paths; decision pending. Until then, develop against local Supabase. See §4.4.
+1. **Supabase staging tier — DEFERRED INDEFINITELY (Phase 4 marked complete).** A self-hosted Supabase stack on percy.network was prototyped, but a single shared instance can't safely back multiple projects: the `public` schema, `auth.users` + the `handle_new_user` trigger, and `supabase_migrations` history all collide across projects. Per-project stacks (one subdomain each) or Supabase Branching (paid plan) are the viable paths; decision deferred until a concrete need arises. Until then, develop against local Supabase. See §4.4.
 2. **Empty `tests/` dir — model-created, refactoring permitted.** Canonical E2E location is `tests/e2e/`. The empty `tests/` is replaced by `tests/e2e/.gitkeep` to make intent concrete in the repo.
 3. **Root `rls_policies.sql` — duplicate, deleted.** Source of truth for RLS is `supabase/migrations/20260629100103_rls_policies.sql` (applied via migrations). `supabase/rls.sql` is a reference copy kept in `supabase/`; the root-level duplicate is removed.
 4. **Personas — placeholders, rework deferred.** See §7. Do not encode the current values as a canonical union type or fix the broken map piecemeal; wait for the dedicated persona-rework track.

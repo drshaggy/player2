@@ -11,7 +11,7 @@ The move selection process follows a strict hierarchy to ensure educational goal
 
 - **Opening Book**: A hierarchical tree lookup (`src/lib/openingBook.ts`) that provides a map of opening names to specific SAN moves. It is queried on every turn to ensure goal alignment throughout the opening phase. `getOpeningMoves(history)` traverses the tree; `getOpeningMove(history, persona)` selects one (persona matching is a placeholder — see ENGINEERING_PLAN §7).
 - **Lichess Masters Database**: `src/lib/services/lichess.ts` — fetches statistically most-played moves by masters for the current position. Injected as high-priority candidates to guide the AI toward theory.
-- **Stockfish**: Generates a list of legal candidate moves with evaluation scores via the `chess-api.com` WebSocket (in `ChessGame.tsx` `makeAIMove`).
+- **Stockfish**: Generates a list of legal candidate moves with evaluation scores via the `chess-api.com` WebSocket (in `src/hooks/useChessGame.ts` `makeAIMove`).
 - **LLM (Cerebras Gemma-4)**: Receives the context and selects the move index based on the session objective. The `/api/move` route enforces index bounds and returns 422 on out-of-range or missing indices (no silent fallback).
 
 ### 2. Prompting Strategy
@@ -24,20 +24,26 @@ To prevent LLM hallucinations regarding move indices, the system uses:
 - **ASCII Board** (`generateAsciiBoard`): Converts FEN strings into an ASCII grid for LLM spatial awareness.
 - **Semantic State** (`generateSemanticState`): Derives real game phase (opening/middlegame/endgame via move number + major-piece count), material balance (P=1/N=3/B=3/R=5/Q=9 with per-piece diff detail), turn, and piece counts from the FEN. Both live in `src/lib/utils/board.ts`.
 
-## Component Architecture (post-Phase 2 decomposition)
+## Component Architecture (post-Phase 5 decomposition)
 ```
 src/components/
-  ChessGame.tsx     # orchestrator: game state, AI move loop, persistence, chat (657 lines — further extraction deferred)
-  Board.tsx         # chessboard wrapper, captured pieces, status pill
-  ChatPanel.tsx     # message list + input
-  MoveHistory.tsx   # paired move list
-  AuthBadge.tsx     # login/logout UI
+  ChessGame.tsx      # thin orchestrator (135 lines): owns shared refs, wires hooks
+  Board.tsx          # chessboard wrapper, captured pieces, status pill
+  ChatPanel.tsx      # message list + input
+  MoveHistory.tsx    # paired move list
+  AuthBadge.tsx      # login/logout UI
 src/hooks/
-  useAuth.ts        # session subscription, login, logout
+  useAuth.ts             # session subscription, login, logout
+  useChessGame.ts        # board state, AI move loop, board init (211 lines)
+  useCoachChat.ts        # chat, consultation phase, /api/chat (209 lines)
+  useGamePersistence.ts  # gameId/opponent, saveGameMove, createGame, restoreGame (237 lines)
 src/lib/utils/
-  chess.ts          # getPieceImage, processFen (pure helpers)
+  chess.ts          # getPieceImage, processFen, computeCapturedPieces
+  boardInput.ts     # handleChessInput (cm-chessboard move-input handler)
   board.ts          # generateAsciiBoard, generateSemanticState
 ```
+
+**Cross-hook wiring:** the orchestrator owns the shared refs (`chessGameRef`, `boardInstanceRef`, `boardRef`, `sessionGoalRef`). Two latest-callback refs break the circular call-order dependency: `setChatMessagesRef` (let `useChessGame.makeAIMove` append AI commentary) and `applyRestoredStateRef` (let `useGamePersistence`'s restore effect sync the other hooks' UI state after replay).
 
 ## Tech Stack
 - **Frontend/Backend**: Next.js (App Router), TypeScript, Tailwind CSS.

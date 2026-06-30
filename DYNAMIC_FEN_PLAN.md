@@ -14,7 +14,7 @@ Allow the AI and the user to specify the starting FEN for a game during the cons
 - **Response Update**: Add a `suggestedFen` field to the API response. The AI can populate this when it decides a specific position is required.
 - **Prompt Engineering**: Update the system prompt to instruct the AI coach to provide a valid FEN in the `suggestedFen` field when the user requests specific openings or endgame practice.
 
-### 2. Client-Side Logic (`ChessGame.tsx`)
+### 2. Client-Side Logic (`src/hooks/useCoachChat.ts`)
 - **FEN Parsing**: Implement a check in `handleSendMessage` to detect if the user's message is a valid FEN string. If so, update the local `chessGame` state immediately.
 - **AI Suggestion Handling**: When the `/api/chat` response contains a `suggestedFen`, update the board and the internal `chessGame` instance.
 - **Visual Feedback**: Ensure the board reflects the new FEN immediately during the consultation phase so the user can verify the position.
