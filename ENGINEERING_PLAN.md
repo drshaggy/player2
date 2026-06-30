@@ -257,11 +257,11 @@ Sequenced so each step is independently shippable and the agent can verify as it
 3. **Fix the broken openingBook tests** (remove self-mock). Make them pass against real code. Commit. ✅
 4. **Audit all `*.test.ts`** for the self-mock anti-pattern. Fix or delete. Commit. ✅ (no other instances found)
 
-### Phase 2 — Architecture
-5. **Implement real `generateSemanticState`.** Add tests. Commit.
-6. **Fix or remove `getOpeningMove` persona param.** Add tests. Commit.
-7. **Remove silent index fallback in `route.ts`.** Return 422 with debug payload. Update test. Commit.
-8. **Decompose `ChessGame.tsx`** into hooks + components. Keep behavior identical. E2E test must still pass. Commit in slices (one extraction per commit).
+### Phase 2 — Architecture ✅
+5. **Implement real `generateSemanticState`.** Add tests. Commit. ✅
+6. **Fix or remove `getOpeningMove` persona param.** Add tests. Commit. ✅ (dropped unused param from `getOpeningMoves`; `getOpeningMove` keeps param with TODO, full rework deferred to §7)
+7. **Remove silent index fallback in `route.ts`.** Return 422 with debug payload. Update test. Commit. ✅
+8. **Decompose `ChessGame.tsx`** into hooks + components. Keep behavior identical. E2E test must still pass. Commit in slices (one extraction per commit). ✅ (907→657 lines; extracted useAuth + AuthBadge + Board + ChatPanel + MoveHistory + chess utils; remaining logic deferred to future slice)
 
 ### Phase 3 — Testing harness
 9. **Add `src/__fixtures__/`** with FENs and recorded API responses. Commit.
