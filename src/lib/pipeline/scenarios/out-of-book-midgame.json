@@ -1,0 +1,17 @@
+{
+  "name": "out-of-book-midgame",
+  "description": "Middlegame position, no opening book coverage. LLM picks the top candidate; openingContext is empty.",
+  "input": {
+    "fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2N1BN2/PPP2PPP/R2Q1RK1 w - - 0 15",
+    "candidates": [
+      { "move": "Bg5", "from": "f1", "to": "g5", "score": "0.2", "depth": 18 },
+      { "move": "Qc2", "from": "d1", "to": "c2", "score": "0.15", "depth": 18 }
+    ],
+    "persona": "balanced",
+    "sessionGoal": null,
+    "openingContext": [],
+    "history": []
+  },
+  "llmPicksIndex": 1,
+  "expectedMoveSan": "Bg5"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "no-goal-best-move",
+  "description": "No session goal. LLM should fall back to the top engine move (index 1).",
+  "input": {
+    "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+    "candidates": [
+      { "move": "e5", "from": "e7", "to": "e5", "score": "0.3", "depth": 10 },
+      { "move": "c5", "from": "c7", "to": "c5", "score": "0.4", "depth": 10 }
+    ],
+    "persona": "aggressive",
+    "sessionGoal": "",
+    "openingContext": [],
+    "history": ["e2e4"]
+  },
+  "llmPicksIndex": 1,
+  "expectedMoveSan": "e5"
+}

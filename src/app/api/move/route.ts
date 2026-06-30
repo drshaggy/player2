@@ -1,179 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SYSTEM_PROMPTS } from '@/lib/prompts/index';
 import { LLM_CONFIG } from '@/lib/config/llm';
-import { generateAsciiBoard, generateSemanticState } from '@/lib/utils/board';
-import { getMasterOpeningMoves } from '@/lib/services/lichess';
+import { runMovePipeline, type ChatMessage } from '@/lib/pipeline/movePipeline';
 
 export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
   try {
-    try {
-      const body = await req.json();
-      const { fen, candidates, persona = 'aggressive', messages = [], sessionGoal, openingContext, history = '' } = body;
-      const API_KEY = process.env.LLM_API_KEY;
+    const body = await req.json();
+    const { fen, candidates, persona = 'aggressive', messages = [], sessionGoal, openingContext, history = '' } = body;
+    const API_KEY = process.env.LLM_API_KEY;
 
-      if (!API_KEY) {
-        return NextResponse.json({ error: 'LLM_API_KEY not configured' }, { status: 500 });
-      }
-
-      const processedCandidates = [...candidates];
-      let masterOpeningContext: Array<{ move: string; san: string; theoryCount: number; averageRating: number; opening: { eco: string; name: string } | null | undefined }> = [];
-
-      // 1. Integrate Lichess Masters Database
-      try {
-        const uciHistory = Array.isArray(history) ? history.join(',') : history;
-        
-        if (uciHistory || candidates.length > 0) {
-          const masterMoves = await getMasterOpeningMoves(uciHistory);
-          if (masterMoves && masterMoves.length > 0) {
-            masterOpeningContext = masterMoves.map(m => ({
-              move: m.uci,
-              san: m.san,
-              theoryCount: m.total,
-              averageRating: m.averageRating,
-              opening: m.opening
-            }));
-
-            // Add master moves to candidates if they aren't there
-            for (const masterMove of masterOpeningContext) {
-              const exists = processedCandidates.find(c => c.move === masterMove.move);
-              if (!exists) {
-                processedCandidates.push({
-                  move: masterMove.move,
-                  from: '', 
-                  to: '',
-                  score: `${masterMove.theoryCount} games (Masters)`,
-                  depth: 0
-                });
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Lichess integration failed:', e);
-      }
-
-      console.log('--- [DEBUG] Post-Lichess State ---');
-      console.log('processedCandidates length:', processedCandidates.length);
-      console.log('openingContext length:', openingContext?.length);
-
-      // Ensure opening book moves that might match the goal are included as candidates
-      if (Array.isArray(openingContext)) {
-
-        for (const bookMove of openingContext) {
-          const alreadyExists = processedCandidates.find(c => c.move === bookMove.move);
-          if (!alreadyExists) {
-            processedCandidates.push({
-              move: bookMove.move,
-              from: '', 
-              to: '',
-              score: '0.0 (Book)',
-              depth: 0
-            });
-          }
-        }
-      }
-
-      if (!processedCandidates || !Array.isArray(processedCandidates) || processedCandidates.length === 0) {
-        return NextResponse.json({ error: 'No candidate moves provided' }, { status: 400 });
-      }
-
-      // 1. Build Context for LLM
-      const boardMap = generateAsciiBoard(fen);
-      const semanticState = generateSemanticState(fen);
-
-      const systemPrompt = SYSTEM_PROMPTS.moveSelection(
-        persona, 
-        boardMap, 
-        semanticState, 
-        fen, 
-        processedCandidates, 
-        [...(openingContext || []), ...masterOpeningContext], 
-        sessionGoal
-      );
-
-      const llmMessages = [
-        { role: 'system', content: systemPrompt },
-        ...messages,
-        { role: 'user', content: 'What move should we make now?' }
-      ];
-
-      console.log('Calling LLM at endpoint:', LLM_CONFIG.endpoint);
-      const llmResponse = await fetch(LLM_CONFIG.endpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: LLM_CONFIG.model,
-          messages: llmMessages,
-          response_format: { type: 'json_object' },
-        }),
-      });
-
-      console.log('LLM Response status:', llmResponse.status);
-      if (!llmResponse.ok) {
-        const errorText = await llmResponse.text();
-        console.error('LLM API error response:', errorText);
-        throw new Error(`LLM API failed with status ${llmResponse.status}: ${errorText}`);
-      }
-
-      const llmData = await llmResponse.json();
-      
-      if (!llmData.choices || llmData.choices.length === 0) {
-        throw new Error('Invalid LLM response');
-      }
-
-      let content = llmData.choices[0].message.content;
-      content = content.replace(/```json\n?/, '').replace(/```$/, '').trim();
-
-      let result;
-      try {
-        result = JSON.parse(content);
-       } catch {
-         console.error('Failed to parse LLM JSON response:', content);
-         throw new Error('LLM returned invalid JSON');
-       }
-
-      if (!result || typeof result.selectedMoveIndex !== 'number') {
-        console.error('LLM response missing selectedMoveIndex:', result);
-        return NextResponse.json({
-          error: 'LLM response missing selectedMoveIndex',
-          llmResponse: content,
-          parsed: result,
-        }, { status: 422 });
-      }
-
-      const selectedIndex = result.selectedMoveIndex - 1;
-      if (selectedIndex < 0 || selectedIndex >= processedCandidates.length) {
-        console.error(`LLM returned out-of-range selectedMoveIndex ${result.selectedMoveIndex} (valid: 1..${processedCandidates.length}):`, content);
-        return NextResponse.json({
-          error: `LLM returned out-of-range selectedMoveIndex ${result.selectedMoveIndex} (valid: 1..${processedCandidates.length})`,
-          llmResponse: content,
-          candidateCount: processedCandidates.length,
-        }, { status: 422 });
-      }
-
-      const chosenCandidate = processedCandidates[selectedIndex];
-
-      return NextResponse.json({
-        move: {
-          from: chosenCandidate.from,
-          to: chosenCandidate.to,
-          promotion: 'q',
-          san: chosenCandidate.move
-        },
-        commentary: result.commentary,
-      });
-
-    } catch (error: unknown) {
-      console.error('Inner Error in /api/move:', error);
-      return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal Server Error' }, { status: 500 });
+    if (!API_KEY) {
+      return NextResponse.json({ error: 'LLM_API_KEY not configured' }, { status: 500 });
     }
-  } catch (globalError: unknown) {
-    console.error('Global Error in /api/move:', globalError);
-    return NextResponse.json({ error: 'Critical Internal Server Error' }, { status: 500 });
+
+    console.log('Calling LLM at endpoint:', LLM_CONFIG.endpoint);
+
+    const result = await runMovePipeline(
+      { fen, candidates, persona, messages, sessionGoal, openingContext, history },
+      {
+        apiKey: API_KEY,
+        fetchLLM: (_systemPrompt: string, llmMessages: ChatMessage[]) =>
+          fetch(LLM_CONFIG.endpoint, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: LLM_CONFIG.model,
+              messages: llmMessages,
+              response_format: { type: 'json_object' },
+            }),
+          }),
+      },
+    );
+
+    switch (result.status) {
+      case 'ok':
+        return NextResponse.json({ move: result.move, commentary: result.commentary });
+      case 'no-candidates':
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      case 'bad-index':
+        console.error(`Bad LLM index (${result.candidateCount} candidates):`, result.llmResponse);
+        return NextResponse.json(
+          { error: result.error, llmResponse: result.llmResponse, candidateCount: result.candidateCount },
+          { status: 422 },
+        );
+      case 'llm-error':
+        console.error('LLM error in /api/move:', result.error);
+        return NextResponse.json({ error: result.error }, { status: 500 });
+    }
+  } catch (error: unknown) {
+    console.error('Error in /api/move:', error);
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal Server Error' }, { status: 500 });
   }
 }

@@ -3,8 +3,9 @@
 ## Documentation
 - **AGENTS.md** - Update this file with commands and rules specific to this project
 - **ARCHITECTURE.md**
-- **ENGINEERING_PLAN.md** - Architecture, testing harness, and deployment strategy (Phases 1-2 complete; Phase 3 next)
+- **ENGINEERING_PLAN.md** - Architecture, testing harness, and deployment strategy (Phases 1-3 complete; Phase 4 in progress)
 - **DYNAMIC_FEN_PLAN.md**
+- **docs/staging-setup.md** - Step-by-step staging Supabase project creation (Phase 4 step 15, manual)
 - **Update all Docs**  - When asked to update all docs, all .md files 
 - Add new md files to this list so you know to read them 
 
@@ -20,24 +21,28 @@
 - **Build Project**: `npm run build`
 - **Run Tests**: `npm run test`
 - **Watch Tests**: `npm run test:watch`
+- **Run Scenario Tests (move pipeline)**: `npm run test:scenarios`
+- **Run E2E (opt-in, needs local Supabase)**: `npm run test:e2e`
+- **Reset local DB**: `npm run db:reset` (→ `supabase db reset`)
 - **Typecheck**: `npm run typecheck`
 - **Lint**: `npm run lint`
-- **Verify (all-in-one gate)**: `npm run verify` — runs typecheck + lint + test. Run this before declaring any task complete.
+- **Verify (all-in-one gate)**: `npm run verify` — runs typecheck + lint + test (unit/component/scenario). Run this before declaring any task complete. E2E is NOT included.
 - **Supabase**: Use the Supabase MCP Server
 
 ## Verification Protocol (for agents)
 Before completing any task:
-1. `npm run verify` (typecheck + lint + unit tests)
-2. If touching DB: `supabase db reset && npm run test:e2e` (E2E not yet wired — Phase 3)
+1. `npm run verify` (typecheck + lint + unit/component/scenario tests)
+2. If touching DB: `npm run db:reset && npm run test:e2e`
 3. If touching UI: smoke-test the relevant flow in the browser via `npm run dev`
 Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix the root cause.
 
 ## Testing Conventions
 - Pure functions: collocated `*.test.ts`, exhaustive cases.
 - API routes: mock `fetch` (LLM + Lichess + Supabase), test status codes and response shapes.
-- Components: `*.test.tsx` with Testing Library, test behavior not implementation (Phase 3).
-- Fixtures will live in `src/__fixtures__/` (Phase 3). Never inline magic FENs in tests.
-- E2E tests live in `tests/e2e/` and run against local Supabase only (Phase 3).
+- Components: `*.test.tsx` with Testing Library + jest-dom (matchers registered in `vitest.setup.ts`), test behavior not implementation.
+- Move pipeline: scenario-driven via `src/lib/pipeline/` (`movePipeline.ts` + `scenarios/*.json` + `movePipeline.test.ts`). The route (`/api/move/route.ts`) is a thin adapter over `runMovePipeline` — add new pipeline behavior to the extracted module, not the route.
+- Fixtures live in `src/__fixtures__/`. Never inline magic FENs in tests — import from `FENS`.
+- E2E tests live in `tests/e2e/` and run against local Supabase only. They are excluded from vitest.
 - Never mock the module under test — mock at the boundaries (fetch, external services).
 
 ## Tooling
@@ -75,6 +80,10 @@ Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix 
 - Pure helpers in `src/lib/utils/chess.ts` (`getPieceImage`, `processFen`).
 - AI pipeline: opening book → Lichess masters → Stockfish candidates → LLM pick (with 422 on bad index, no silent fallback).
 - `generateSemanticState` is real (phase detection + material balance), not a stub.
+- Move pipeline extracted to `src/lib/pipeline/movePipeline.ts` (`runMovePipeline`); `/api/move/route.ts` is a thin NextResponse adapter. Scenario tests in `src/lib/pipeline/scenarios/` + `movePipeline.test.ts`.
+- Test fixtures centralized in `src/__fixtures__/` (`fens.ts`, `games.ts`, `lichessResponses.ts`, `llmResponses.ts`).
+- Component tests for `Board`, `ChatPanel`, `MoveHistory` (Testing Library + jest-dom, matchers in `vitest.setup.ts`).
+- E2E: Playwright (`playwright.config.ts`, `tests/e2e/`), opt-in via `npm run test:e2e`, excluded from vitest.
 
 ## Current Progress
 - [x] Project initialized with Next.js, TS, Tailwind.
@@ -90,5 +99,5 @@ Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix 
 - [x] ENGINEERING_PLAN Phase 1 — Foundations (verify harness, fixed broken tests, lint cleanup).
 - [x] ENGINEERING_PLAN Phase 2 — Architecture (real `generateSemanticState`, persona cleanup, 422 on bad index, decomposed `ChessGame.tsx`).
 - [x] Unblocked local dev + production build (`.env.local` fix, `force-dynamic`).
-- [ ] ENGINEERING_PLAN Phase 3 — Testing harness (fixtures, scenario pipeline, component tests, E2E).
+- [x] ENGINEERING_PLAN Phase 3 — Testing harness (fixtures, scenario pipeline extracted from route, component tests, Playwright E2E).
 - [ ] ENGINEERING_PLAN Phase 4 — Deployment isolation (staging Supabase, seed, PR template).

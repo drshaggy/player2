@@ -1,10 +1,10 @@
 # Engineering Plan: Architecture, Testing Harness, and Deployment Strategy
 
-**Status:** Phases 1-2 complete. Phase 3 (testing harness) is next.
+**Status:** Phases 1-3 complete. Phase 4 (deployment isolation) is next.
 **Audience:** Future coding agents (small model) and human contributors.
 **Goal:** Shore up the architecture so a small model can safely iterate, build a testing harness that catches real bugs (not just happy paths), and stop deploying to production to test changes.
 
-> **Resume note:** The codebase is in a working state — `npm run verify` passes (36 tests, typecheck, lint), `npm run build` succeeds, and `npm run dev` returns HTTP 200. Phase 3 starts at step 9 below.
+> **Resume note:** The codebase is in a working state — `npm run verify` passes (71 tests across 13 files: typecheck, lint, unit + component + scenario tests), `npm run build` succeeds. E2E is wired (`npm run test:e2e`, opt-in, needs local Supabase). Phase 4 starts at step 13 below.
 
 ---
 
@@ -23,7 +23,7 @@
 2. **Stubs masquerading as features** — RESOLVED (Phase 2.5, 2.6): `generateSemanticState` now does real phase/material analysis; `getOpeningMove` persona param is honest with a TODO (full rework deferred to §7).
 3. **Tests that test mocks, not code** — RESOLVED (Phase 1.3, 1.4): `openingBook.test.ts` rewritten to test real code; all test files audited.
 4. **Silent failure masking** — RESOLVED (Phase 2.7): `/api/move` returns 422 with debug payload on bad index, no fallback.
-5. **No E2E tests** — STILL OPEN (Phase 3.5): Playwright installed but unused. `tests/e2e/.gitkeep` placeholder exists.
+5. **No E2E tests** — RESOLVED (Phase 3.12): Playwright wired with `playwright.config.ts`, `npm run test:e2e`, smoke + consultation specs in `tests/e2e/`. Opt-in (not part of `verify`); requires local Supabase.
 6. **No type check or lint gate** — RESOLVED (Phase 1.1): `npm run verify` is the single gate.
 7. **Deployment = production** — STILL OPEN (Phase 4): Vercel Previews still hit prod Supabase. Staging project planned.
 
@@ -260,17 +260,17 @@ Sequenced so each step is independently shippable and the agent can verify as it
 7. **Remove silent index fallback in `route.ts`.** Return 422 with debug payload. Update test. Commit. ✅
 8. **Decompose `ChessGame.tsx`** into hooks + components. Keep behavior identical. E2E test must still pass. Commit in slices (one extraction per commit). ✅ (907→657 lines; extracted useAuth + AuthBadge + Board + ChatPanel + MoveHistory + chess utils; remaining logic deferred to future slice)
 
-### Phase 3 — Testing harness (NEXT)
-9. **Add `src/__fixtures__/`** with FENs and recorded API responses. Commit.
-10. **Build the scenario harness** (`movePipeline.ts` + scenarios + test). Commit.
-11. **Add component tests** for decomposed components. Commit.
-12. **Wire up Playwright E2E** against local Supabase. Add `test:e2e` script. Commit.
+### Phase 3 — Testing harness ✅
+9. **Add `src/__fixtures__/`** with FENs and recorded API responses. Commit. ✅ (`fens.ts`, `games.ts`, `lichessResponses.ts`, `llmResponses.ts`, `index.ts`, plus `fixtures.test.ts` validating FENs against chess.js)
+10. **Build the scenario harness** (`movePipeline.ts` + scenarios + test). Commit. ✅ (extracted `runMovePipeline` from `route.ts`; `route.ts` is now a thin NextResponse adapter; 4 scenarios in `src/lib/pipeline/scenarios/`; `movePipeline.test.ts` covers happy paths, merges, and all failure modes; `npm run test:scenarios`)
+11. **Add component tests** for decomposed components. Commit. ✅ (`Board.test.tsx`, `ChatPanel.test.tsx`, `MoveHistory.test.tsx` via Testing Library + jest-dom; `vitest.setup.ts` registers matchers)
+12. **Wire up Playwright E2E** against local Supabase. Add `test:e2e` script. Commit. ✅ (`playwright.config.ts`, `tests/e2e/smoke.spec.ts`, `tests/e2e/consultation-flow.spec.ts`; `npm run test:e2e`; excluded from vitest)
 
-### Phase 4 — Deployment isolation
-13. **Document `.env.example`** and split `.env.local` for local Supabase. Commit.
-14. **Extend `supabase/seed.sql`** with test user + Coach bot + sample game. Commit.
-15. **Create `player2-staging` Supabase project**, push migrations, configure Vercel Preview env vars (§4.4). Document in README. Commit.
-16. **Add PR template** (`.github/pull_request_template.md`) reminding to run `npm run verify` and smoke-test the preview. Commit.
+### Phase 4 — Deployment isolation (partially complete)
+13. **Document `.env.example`** and split `.env.local` for local Supabase. Commit. ✅ (`.env.example` rewritten with local/staging/prod tier docs; README updated with local-dev first-run and deployment tiers)
+14. **Extend `supabase/seed.sql`** with test user + Coach bot + sample game. Commit. ✅ (test user `test@player2.local`/`password123` seeded into `auth.users` with bcrypt hash; Coach bot upserted; sample game row; idempotent via `ON CONFLICT`)
+15. **Create `player2-staging` Supabase project**, push migrations, configure Vercel Preview env vars (§4.4). Document in README. Commit. ⏳ **MANUAL** — the Supabase MCP is linked to the prod project and has no project-creation tool. See `docs/staging-setup.md` for step-by-step instructions backed by the Supabase Management API docs.
+16. **Add PR template** (`.github/pull_request_template.md`) reminding to run `npm run verify` and smoke-test the preview. Commit. ✅
 
 ---
 
