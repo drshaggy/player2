@@ -3,6 +3,8 @@
 ## Documentation
 - **AGENTS.md** - Update this file with commands and rules specific to this project
 - **ARCHITECTURE.md**
+- **ENGINEERING_PLAN.md** - Architecture, testing harness, and deployment strategy
+- **DYNAMIC_FEN_PLAN.md**
 - **Update all Docs**  - When asked to update all docs, all .md files 
 - Add new md files to this list so you know to read them 
 
