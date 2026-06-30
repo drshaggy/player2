@@ -91,7 +91,7 @@ describe('movePipeline failure modes', () => {
       json: async () => ({ choices: [{ message: { content: JSON.stringify({ selectedMoveIndex: 99 }) } }] }),
       text: async () => '{}',
     });
-    const result = await runMovePipeline(baseInput, { apiKey: 'k', fetchLLM, getMasterMoves: mockGetMasterMoves() });
+    const result = await runMovePipeline(baseInput, { apiKey: 'k', fetchLLM, getMasterMoves: mockGetMasterMoves(), getMasterMovesByFen: vi.fn().mockResolvedValue([]), getBookMovesByFen: vi.fn().mockReturnValue([]) });
     expect(result.status).toBe('bad-index');
     if (result.status !== 'bad-index') return;
     expect(result.statusCode).toBe(422);
@@ -107,7 +107,7 @@ describe('movePipeline failure modes', () => {
       json: async () => ({ choices: [{ message: { content: JSON.stringify({ commentary: 'nope' }) } }] }),
       text: async () => '{}',
     });
-    const result = await runMovePipeline(baseInput, { apiKey: 'k', fetchLLM, getMasterMoves: mockGetMasterMoves() });
+    const result = await runMovePipeline(baseInput, { apiKey: 'k', fetchLLM, getMasterMoves: mockGetMasterMoves(), getMasterMovesByFen: vi.fn().mockResolvedValue([]), getBookMovesByFen: vi.fn().mockReturnValue([]) });
     expect(result.status).toBe('bad-index');
     if (result.status !== 'bad-index') return;
     expect(result.error).toMatch(/missing selectedMoveIndex/);
@@ -116,7 +116,7 @@ describe('movePipeline failure modes', () => {
   it('returns no-candidates (400) when candidates is empty', async () => {
     const result = await runMovePipeline(
       { ...baseInput, candidates: [] },
-      { apiKey: 'k', fetchLLM: mockFetchLLM(1), getMasterMoves: mockGetMasterMoves() },
+      { apiKey: 'k', fetchLLM: mockFetchLLM(1), getMasterMoves: mockGetMasterMoves(), getMasterMovesByFen: vi.fn().mockResolvedValue([]), getBookMovesByFen: vi.fn().mockReturnValue([]) },
     );
     expect(result.status).toBe('no-candidates');
     if (result.status !== 'no-candidates') return;
@@ -130,7 +130,7 @@ describe('movePipeline failure modes', () => {
       json: async () => ({}),
       text: async () => 'upstream down',
     });
-    const result = await runMovePipeline(baseInput, { apiKey: 'k', fetchLLM, getMasterMoves: mockGetMasterMoves() });
+    const result = await runMovePipeline(baseInput, { apiKey: 'k', fetchLLM, getMasterMoves: mockGetMasterMoves(), getMasterMovesByFen: vi.fn().mockResolvedValue([]), getBookMovesByFen: vi.fn().mockReturnValue([]) });
     expect(result.status).toBe('llm-error');
     if (result.status !== 'llm-error') return;
     expect(result.statusCode).toBe(500);
@@ -144,7 +144,7 @@ describe('movePipeline failure modes', () => {
       json: async () => ({ choices: [{ message: { content: 'not json' } }] }),
       text: async () => 'not json',
     });
-    const result = await runMovePipeline(baseInput, { apiKey: 'k', fetchLLM, getMasterMoves: mockGetMasterMoves() });
+    const result = await runMovePipeline(baseInput, { apiKey: 'k', fetchLLM, getMasterMoves: mockGetMasterMoves(), getMasterMovesByFen: vi.fn().mockResolvedValue([]), getBookMovesByFen: vi.fn().mockReturnValue([]) });
     expect(result.status).toBe('llm-error');
     if (result.status !== 'llm-error') return;
     expect(result.error).toMatch(/invalid JSON/);
@@ -159,7 +159,7 @@ describe('movePipeline failure modes', () => {
       }),
       text: async () => '{}',
     });
-    const result = await runMovePipeline(baseInput, { apiKey: 'k', fetchLLM, getMasterMoves: mockGetMasterMoves() });
+    const result = await runMovePipeline(baseInput, { apiKey: 'k', fetchLLM, getMasterMoves: mockGetMasterMoves(), getMasterMovesByFen: vi.fn().mockResolvedValue([]), getBookMovesByFen: vi.fn().mockReturnValue([]) });
     expect(result.status).toBe('ok');
   });
 });

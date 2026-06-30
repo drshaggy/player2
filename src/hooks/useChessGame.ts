@@ -7,7 +7,7 @@ import { Chessboard, COLOR } from 'cm-chessboard';
 import { Markers } from 'cm-chessboard/src/extensions/markers/Markers';
 import 'cm-chessboard/assets/chessboard.css';
 import { supabase } from '@/lib/supabase';
-import { getOpeningMoves } from '@/lib/openingBook';
+import { getOpeningMoves, getOpeningMovesByFen } from '@/lib/openingBook';
 import { computeCapturedPieces } from '@/lib/utils/chess';
 import { handleChessInput } from '@/lib/utils/boardInput';
 import { categorizeAiMoveError } from '@/lib/utils/errorCategorize';
@@ -59,7 +59,9 @@ export function useChessGame({
     let httpStatus: number | undefined;
     try {
       const history = currentChessGame.history();
-      const bookOptions = getOpeningMoves(history);
+      const bookOptions = history.length > 0
+        ? getOpeningMoves(history)
+        : getOpeningMovesByFen(currentChessGame.fen());
       let openingContext: ReturnType<typeof getOpeningMoves> | null = null;
 
       if (bookOptions && bookOptions.length > 0) {

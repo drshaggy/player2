@@ -150,6 +150,45 @@ export function getOpeningMoves(history: string[]): OpeningMove[] {
     .map(c => c.moveInfo as OpeningMove);
 }
 
+/**
+ * FEN-based opening book lookup. Traverses the book tree, playing each move
+ * on a Chess instance, and returns the children of the node whose position
+ * matches the given FEN (piece placement + side to move only — castling /
+ * en passant / clocks are ignored so transpositions match).
+ *
+ * Needed because games started from a consultation FEN have empty
+ * chess.js history, so getOpeningMoves([]) returns root moves instead of
+ * the opening's actual continuations.
+ */
+export function getOpeningMovesByFen(fen: string): OpeningMove[] {
+  // Lazy import to avoid circular dependency at module load time.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Chess } = require('chess.js');
+  const targetPlacement = fen.split(' ').slice(0, 2).join(' ');
+
+  function search(node: OpeningNode, game: InstanceType<typeof Chess>): OpeningMove[] {
+    for (const [san, child] of Object.entries(node.children)) {
+      const testGame = new Chess(game.fen());
+      try {
+        testGame.move(san);
+      } catch {
+        continue;
+      }
+      const placement = testGame.fen().split(' ').slice(0, 2).join(' ');
+      if (placement === targetPlacement) {
+        return Object.values(child.children)
+          .filter(c => c.moveInfo)
+          .map(c => c.moveInfo as OpeningMove);
+      }
+      const deeper = search(child, testGame);
+      if (deeper.length > 0) return deeper;
+    }
+    return [];
+  }
+
+  return search(OPENING_BOOK, new Chess());
+}
+
 // TODO(persona-rework, ENGINEERING_PLAN §7): The persona-based style matching
 // below is a placeholder. The canonical persona set is not yet defined, and
 // only 'aggressive' currently maps to a style. Callers pass 'balanced' which

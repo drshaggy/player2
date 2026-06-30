@@ -1,6 +1,7 @@
 import { SYSTEM_PROMPTS } from '@/lib/prompts/index';
 import { generateAsciiBoard, generateSemanticState } from '@/lib/utils/board';
-import { getMasterOpeningMoves, type LichessMove } from '@/lib/services/lichess';
+import { getMasterOpeningMoves, getMasterOpeningMovesByFen, type LichessMove } from '@/lib/services/lichess';
+import { getOpeningMovesByFen } from '@/lib/openingBook';
 
 export interface CandidateMove {
   move: string;
@@ -57,6 +58,8 @@ export interface PipelineDeps {
   fetchLLM: FetchLLM;
   // Overridable for tests; defaults to the real Lichess service.
   getMasterMoves?: (play: string) => Promise<LichessMove[]>;
+  getMasterMovesByFen?: (fen: string) => Promise<LichessMove[]>;
+  getBookMovesByFen?: (fen: string) => import('@/lib/openingBook').OpeningMove[];
 }
 
 export type PipelineResult =
@@ -86,13 +89,33 @@ export async function runMovePipeline(
 
   const processedCandidates: CandidateMove[] = [...candidates];
   const masterOpeningContext: MasterOpeningContext[] = [];
+  let effectiveOpeningContext = openingContext;
+
+  const uciHistory = Array.isArray(history) ? history.join(',') : history;
+  const hasHistory = uciHistory && uciHistory.length > 0;
+
+  // When history is empty (game started from a consultation FEN), the
+  // opening book and Lichess play-parameter lookups return starting-position
+  // context, not the opening's actual continuations. Fall back to FEN-based
+  // lookups so the LLM still gets correct opening context (e.g. Caro-Kann).
+  if (!hasHistory) {
+    const bookMovesByFen = (deps.getBookMovesByFen ?? getOpeningMovesByFen)(fen);
+    if (bookMovesByFen.length > 0) {
+      effectiveOpeningContext = bookMovesByFen;
+    }
+  }
 
   // 1. Lichess masters integration.
   try {
-    const uciHistory = Array.isArray(history) ? history.join(',') : history;
-    if (uciHistory || candidates.length > 0) {
-      const getMoves = deps.getMasterMoves ?? getMasterOpeningMoves;
-      const masterMoves = await getMoves(uciHistory);
+    if (hasHistory || candidates.length > 0) {
+      let masterMoves: LichessMove[] | null = null;
+      if (hasHistory) {
+        const getMoves = deps.getMasterMoves ?? getMasterOpeningMoves;
+        masterMoves = await getMoves(uciHistory);
+      } else {
+        const getMovesByFen = deps.getMasterMovesByFen ?? getMasterOpeningMovesByFen;
+        masterMoves = await getMovesByFen(fen);
+      }
       if (masterMoves && masterMoves.length > 0) {
         for (const m of masterMoves) {
           masterOpeningContext.push({
@@ -120,8 +143,8 @@ export async function runMovePipeline(
   }
 
   // 2. Merge opening-book moves that might match the goal.
-  if (Array.isArray(openingContext)) {
-    for (const bookMove of openingContext) {
+  if (Array.isArray(effectiveOpeningContext)) {
+    for (const bookMove of effectiveOpeningContext) {
       const alreadyExists = processedCandidates.find((c) => c.move === bookMove.move);
       if (!alreadyExists) {
         processedCandidates.push({
@@ -145,7 +168,7 @@ export async function runMovePipeline(
   // Master-opening entries lack name/description (only book entries have them);
   // the prompt renders `undefined` for those, matching the original route's
   // behavior. Cast to satisfy the prompt's param type without altering output.
-  const mergedOpeningContext = [...(openingContext || []), ...masterOpeningContext] as unknown as Parameters<
+  const mergedOpeningContext = [...(effectiveOpeningContext || []), ...masterOpeningContext] as unknown as Parameters<
     typeof SYSTEM_PROMPTS.moveSelection
   >[5];
   const systemPrompt = SYSTEM_PROMPTS.moveSelection(

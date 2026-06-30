@@ -3,6 +3,7 @@ import { POST } from '@/app/api/move/route';
 
 vi.mock('@/lib/services/lichess', () => ({
   getMasterOpeningMoves: vi.fn().mockResolvedValue([]),
+  getMasterOpeningMovesByFen: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('next/server', async () => {
@@ -116,7 +117,7 @@ describe('Move API Route', () => {
 
     const data = await response.json();
     expect(data.error).toMatch(/out-of-range/);
-    expect(data.candidateCount).toBe(2);
+    expect(data.candidateCount).toBe(3);
     expect(data.llmResponse).toContain('99');
   });
 
