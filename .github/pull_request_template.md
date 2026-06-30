@@ -11,8 +11,8 @@
 ## Deployment notes
 
 <!--
-Preview deployments point at the self-hosted Supabase instance on percy.network (see ENGINEERING_PLAN §4.4 + docs/self-hosting-setup.md).
-Merging to `main` deploys to production.
-- New DB migrations: after merge, run `supabase db push --db-url …` against the self-hosted instance so previews stay in sync.
+Staging backend is deferred (see ENGINEERING_PLAN §4.4). Develop against
+local Supabase for now. Merging to `main` deploys to production.
+- New DB migrations: after merge, apply to the cloud project.
 - Never push directly to `main`.
 -->

@@ -189,21 +189,16 @@ Already scaffolded (`supabase/config.toml`, migrations exist). Make it first-cla
 
 ### 4.4 Tier 2 — Preview deployments with isolated DB
 
-**Chosen approach: self-hosted Supabase on percy.network.** A self-hosted Supabase instance at `supabase.percy.network` backs all Vercel Preview deployments. Data is throwaway; isolated from production. One instance is shared across all percy.network projects (not just player2), amortising the ops cost. Free of recurring SaaS charges; the tradeoff is self-managed updates/backups/TLS (see `docs/self-hosting-setup.md §9`).
+**DEFERRED.** The staging backend for Vercel Preview deployments is on hold pending a multi-project isolation decision.
 
-Setup (full step-by-step in `docs/self-hosting-setup.md`):
-1. On percy.network, bootstrap the Supabase Docker stack and generate secrets (`utils/generate-keys.sh` + `utils/add-new-auth-keys.sh`).
-2. Set `SUPABASE_PUBLIC_URL` / `API_EXTERNAL_URL` / `SITE_URL` to `https://supabase.percy.network`; set `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD`.
-3. Start with HTTPS via the bundled Caddy override (`docker-compose.caddy.yml` → auto Let's Encrypt).
-4. Apply migrations from the player2 repo with `supabase db push --db-url` (self-hosted does NOT use `supabase link`); seed via `psql … -f supabase/seed.sql`.
-5. In Vercel → Settings → Environment Variables, set **Preview** scope to the self-hosted instance:
-   - `NEXT_PUBLIC_SUPABASE_URL` → `https://supabase.percy.network`.
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` → `ANON_KEY` (or `sb_publishable_…`) from `sh run.sh secrets`.
-   - `SUPABASE_SERVICE_ROLE_KEY` → `SERVICE_ROLE_KEY` (or `sb_secret_…`) — server-only.
-   - `LLM_API_KEY`, `LLM_ENDPOINT`, `LLM_MODEL` → reuse production values (LLM is stateless, safe to share).
-6. Seed the self-hosted DB with the test user + Coach bot (§6 step 14) so previews are usable on first load.
+- A self-hosted Supabase stack on percy.network was prototyped in docs, but a single shared instance can't safely back multiple projects (schema/auth/migrations collide — see §8.1). Per-project stacks (one subdomain each) are the clean alternative but add per-project ops.
+- **Until resolved:** develop against **local Supabase** (`supabase start` + `npm run db:reset`) and smoke-test in `npm run dev`. Vercel Preview URLs are not yet wired to a staging DB; do not point them at the production cloud project.
 
-**Future upgrade path — Supabase Branching (requires paid plan):** enables a branch DB per git branch, auto-provisioned via the Vercel-Supabase integration. If the plan is upgraded later, swap the Vercel Preview env vars for the branch integration and retire the self-hosted instance. The rest of the workflow is unchanged.
+When revisited, the two viable options are:
+1. **Per-project self-hosted stacks** — `supabase-<project>.percy.network`, each its own Postgres/Auth/keys. Real isolation; cost is RAM + containers per project.
+2. **Supabase Branching (paid plan)** — branch DB per git branch via the Vercel-Supabase integration. Zero ops; cost is the plan fee.
+
+Setup instructions for option 1 will be re-documented here when the decision is made.
 
 ### 4.5 Tier 3 — Production
 
@@ -212,10 +207,9 @@ Unchanged. `main` branch → Vercel Production → prod Supabase. Never push dir
 ### 4.6 Workflow rules
 
 1. **Branch per change:** `feat/...`, `fix/...`, `chore/...`.
-2. **Open PR → Vercel auto-creates Preview pointed at the self-hosted Supabase instance.**
-3. **Run `npm run verify` locally + smoke-test the preview URL.**
-4. **Squash-merge to `main`** → auto-deploys production.
-5. **DB migrations:** Create via `supabase migration new <name>`, test locally, commit. After merge to `main`, push migrations to the self-hosted instance via `supabase db push --db-url` so previews stay in sync.
+2. **Open PR → run `npm run verify` locally + smoke-test via `npm run dev` against local Supabase.** (Vercel Preview DB wiring is deferred — §4.4.)
+3. **Squash-merge to `main`** → auto-deploys production.
+4. **DB migrations:** Create via `supabase migration new <name>`, test locally with `npm run db:reset`, commit. After merge to `main`, apply migrations to the cloud project.
 
 ---
 
@@ -270,7 +264,7 @@ Sequenced so each step is independently shippable and the agent can verify as it
 ### Phase 4 — Deployment isolation (partially complete)
 13. **Document `.env.example`** and split `.env.local` for local Supabase. Commit. ✅ (`.env.example` rewritten with local/staging/prod tier docs; README updated with local-dev first-run and deployment tiers)
 14. **Extend `supabase/seed.sql`** with test user + Coach bot + sample game. Commit. ✅ (test user `test@player2.local`/`password123` seeded into `auth.users` with bcrypt hash; Coach bot upserted; sample game row; idempotent via `ON CONFLICT`)
-15. **Self-host Supabase on percy.network** (`supabase.percy.network`) — generic instance shared across all percy.network projects. Push migrations + seed, configure Vercel Preview env vars (§4.4). Document in `docs/self-hosting-setup.md` + README. Commit. ⏳ **MANUAL ops** (bootstrap on the server) — instructions in `docs/self-hosting-setup.md`; code/docs side complete.
+15. **Staging backend for Vercel Previews — DEFERRED.** A self-hosted Supabase stack on percy.network was prototyped but a single shared instance can't safely back multiple projects (schema/auth/migrations collide). Per-project stacks or Supabase Branching (paid) are the viable options; decision pending. Until then, develop against local Supabase (`npm run db:reset` + `npm run dev`). Code/docs side (steps 13, 14, 16) complete.
 16. **Add PR template** (`.github/pull_request_template.md`) reminding to run `npm run verify` and smoke-test the preview. Commit. ✅
 
 ---
@@ -287,7 +281,7 @@ Sequenced so each step is independently shippable and the agent can verify as it
 
 ## 8. Resolved Decisions
 
-1. **Supabase staging tier — self-hosted on percy.network.** Replaced the earlier "free cloud staging project" approach (which can't create extra free projects and a paid second project isn't justified) with a self-hosted Supabase Docker stack at `supabase.percy.network`, shared across all percy.network projects. See §4.4 and `docs/self-hosting-setup.md`. Supabase Branching remains the future upgrade path.
+1. **Supabase staging tier — DEFERRED.** A self-hosted Supabase stack on percy.network was prototyped, but a single shared instance can't safely back multiple projects: the `public` schema, `auth.users` + the `handle_new_user` trigger, and `supabase_migrations` history all collide across projects. Per-project stacks (one subdomain each) or Supabase Branching (paid plan) are the viable paths; decision pending. Until then, develop against local Supabase. See §4.4.
 2. **Empty `tests/` dir — model-created, refactoring permitted.** Canonical E2E location is `tests/e2e/`. The empty `tests/` is replaced by `tests/e2e/.gitkeep` to make intent concrete in the repo.
 3. **Root `rls_policies.sql` — duplicate, deleted.** Source of truth for RLS is `supabase/migrations/20260629100103_rls_policies.sql` (applied via migrations). `supabase/rls.sql` is a reference copy kept in `supabase/`; the root-level duplicate is removed.
 4. **Personas — placeholders, rework deferred.** See §7. Do not encode the current values as a canonical union type or fix the broken map piecemeal; wait for the dedicated persona-rework track.
