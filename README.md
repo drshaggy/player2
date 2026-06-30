@@ -26,6 +26,12 @@ npm run dev
 
 The seeded test user is `test@player2.local` / `password123` (local only — never in staging/prod).
 
+### Local dev never hits production
+`npm run dev` runs `scripts/dev-guard.mjs` before booting Next.js. If `.env.local` points `NEXT_PUBLIC_SUPABASE_URL` at the production Supabase project (`zdfscobeyhohhvgylhbh.supabase.co`), the guard aborts with a non-zero exit. This prevents accidental writes to prod data.
+
+- Production env values are kept in `.env.local.prod` (gitignored alongside `.env.local`).
+- To deploy / point at prod intentionally, copy `.env.local.prod` to `.env.local` and re-run with `ALLOW_PROD_DEV=1 npm run dev`.
+
 ### Common commands
 | Command | What it does |
 |---|---|
@@ -37,18 +43,15 @@ The seeded test user is `test@player2.local` / `password123` (local only — nev
 | `npm run build` | Production build |
 
 ### Running E2E locally
-E2E is opt-in (not part of `npm run verify`) because it needs a running local Supabase stack and a DB-shaped `.env.local`. The `playwright.config.ts` `webServer` boots `npm run dev` itself; you only need Supabase + env.
+E2E is opt-in (not part of `npm run verify`) because it needs a running local Supabase stack and a DB-shaped `.env.local`. The `playwright.config.ts` `webServer` boots `npm run dev` itself (the dev-guard will pass since `.env.local` already points at local Supabase for E2E); you only need Supabase + env.
 
 ```bash
 colima start && supabase start     # macOS + Colima; skip colima on Docker Desktop
 npm run db:reset                   # clean seeded state (test user, Coach bot)
-# Back up your prod-pointing .env.local, then point it at local Supabase:
-cp .env.local .env.local.bak
-#   NEXT_PUBLIC_SUPABASE_URL          → http://127.0.0.1:54321
-#   NEXT_PUBLIC_SUPABASE_ANON_KEY     → sb_publishable_...  (from `supabase status`)
-#   SUPABASE_SERVICE_ROLE_KEY         → sb_secret_...       (from `supabase status`)
+# .env.local should already point at http://127.0.0.1:54321 (the dev-guard
+# enforces this — see "Local dev never hits production" above). If you've been
+# testing against prod, restore local env first.
 npm run test:e2e
-mv .env.local.bak .env.local       # restore prod-pointing env
 supabase stop                      # tear down the stack when done
 ```
 

@@ -31,7 +31,7 @@
 ## Verification Protocol (for agents)
 Before completing any task:
 1. `npm run verify` (typecheck + lint + unit/component/scenario tests)
-2. If touching DB: swap `.env.local` to local Supabase (see "Local Supabase on Colima" under Known Build Fixes) → `npm run db:reset && npm run test:e2e` → restore `.env.local`
+2. If touching DB: ensure local Supabase is running and `.env.local` points at `http://127.0.0.1:54321` (the `npm run dev` guard enforces this — see README "Local dev never hits production"), then `npm run db:reset && npm run test:e2e`
 3. If touching UI: smoke-test the relevant flow in the browser via `npm run dev`
 Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix the root cause.
 
