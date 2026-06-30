@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'LLM_API_KEY not configured' }, { status: 500 });
       }
 
-      let processedCandidates = [...candidates];
-      let masterOpeningContext: any[] = [];
+      const processedCandidates = [...candidates];
+      let masterOpeningContext: Array<{ move: string; san: string; theoryCount: number; averageRating: number; opening: { eco: string; name: string } | null | undefined }> = [];
 
       // 1. Integrate Lichess Masters Database
       try {
@@ -132,10 +132,10 @@ export async function POST(req: NextRequest) {
       let result;
       try {
         result = JSON.parse(content);
-      } catch (e) {
-        console.error('Failed to parse LLM JSON response:', content);
-        throw new Error('LLM returned invalid JSON');
-      }
+       } catch {
+         console.error('Failed to parse LLM JSON response:', content);
+         throw new Error('LLM returned invalid JSON');
+       }
 
       if (!result || typeof result.selectedMoveIndex !== 'number') {
         console.error('LLM response missing selectedMoveIndex:', result);
@@ -154,11 +154,11 @@ export async function POST(req: NextRequest) {
         commentary: result.commentary,
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Inner Error in /api/move:', error);
-      return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+      return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal Server Error' }, { status: 500 });
     }
-  } catch (globalError: any) {
+  } catch (globalError: unknown) {
     console.error('Global Error in /api/move:', globalError);
     return NextResponse.json({ error: 'Critical Internal Server Error' }, { status: 500 });
   }

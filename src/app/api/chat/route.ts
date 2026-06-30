@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LLM_CONFIG } from '@/lib/config/llm';
 import { createClient } from '@supabase/supabase-js';
+import { endgameLibrary } from '@/lib/data/endgameLibrary';
 
 export async function POST(req: NextRequest) {
   try {
@@ -186,11 +187,11 @@ Always keep your responses concise and conversational.`;
 
       return NextResponse.json({ content: aiContent });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Inner Error in /api/chat:', error);
-      return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+      return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal Server Error' }, { status: 500 });
     }
-  } catch (globalError: any) {
+  } catch (globalError: unknown) {
     console.error('Global Error in /api/chat:', globalError);
     return NextResponse.json({ error: 'Critical Internal Server Error' }, { status: 500 });
   }

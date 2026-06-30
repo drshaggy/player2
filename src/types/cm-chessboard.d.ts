@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Type shim for the untyped cm-chessboard library. TODO: Phase 2 — replace
+// `any` with proper interfaces once the library's event shape is mapped.
 declare module 'cm-chessboard' {
   export class Chessboard {
     constructor(element: HTMLElement, options?: any);

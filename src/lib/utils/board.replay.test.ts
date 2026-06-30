@@ -28,7 +28,7 @@ describe('Chess Move Replay Logic', () => {
       try {
         chess.move(san);
         results.push('success');
-      } catch (e) {
+      } catch {
         results.push('failure');
       }
     }
@@ -48,7 +48,7 @@ describe('Chess Move Replay Logic', () => {
     for (const san of moveSequence) {
       try {
         chess.move(san);
-      } catch (e) {}
+      } catch {}
     }
     
     // e4 success, invalid failure, e5 success

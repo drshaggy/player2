@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps, @next/next/no-img-element */
+// TODO: Phase 2 (decomposition) — remove this disable and type the event
+// handlers + component state properly. This file is a 903-line god component
+// and piecemeal any-removal here is risky without the broader refactor.
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -818,7 +822,7 @@ export default function ChessGame() {
  
  <div className="flex flex-1 flex-col h-[600px] mt-[90px]">
                <div className="flex flex-col w-full h-full bg-zinc-800 rounded-lg p-4 shadow-xl border border-zinc-700">
-               <h2 className="text-xl font-semibold mb-4 border-b border-zinc-700 pb-2">Coach's Voice</h2>
+                <h2 className="text-xl font-semibold mb-4 border-b border-zinc-700 pb-2">Coach&apos;s Voice</h2>
                <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar mb-4 space-y-3">
                  {chatMessages.length === 0 && <div className="text-zinc-500 italic text-sm">No conversation yet...</div>}
                  {chatMessages.map((msg, i) => (
@@ -871,7 +875,7 @@ export default function ChessGame() {
                setMoveHistory([]);
                setCapturedPieces({ w: [], b: [] });
                setChatMessages([
-                 { role: 'assistant', content: "Welcome back! Before we start this session, tell me: what's our goal for today? Do you want to practice a specific opening, work on your end-game, or just have me be an absolute menace on the board?" }
+    { role: 'assistant', content: "Welcome back! Before we start this session, tell me: what's our goal for today? Do you want to practice a specific opening, work on your end-game, or just have me be an absolute menace on the board?" }
                ]);
                setGameId(null);
                gameIdRef.current = null;

@@ -29,8 +29,8 @@ describe('POST /api/move body readability', () => {
       sessionGoal: 'Practice Sicilian',
     };
 
-    (getMasterOpeningMoves as any).mockResolvedValue([
-      { uci: 'e7e5', san: 'e5', total: 100, averageRating: 2500, opening: null }
+    vi.mocked(getMasterOpeningMoves).mockResolvedValue([
+      { uci: 'e7e5', san: 'e5', total: 100, averageRating: 2500, white: 50, black: 40, draws: 10, opening: null }
     ]);
 
     global.fetch = vi.fn().mockImplementation((url) => {

@@ -1,5 +1,3 @@
-import { Chess } from 'chess.js';
-
 export interface LichessMove {
   uci: string;
   san: string;

@@ -1,5 +1,28 @@
+interface CandidateMove {
+  move: string;
+  score: string;
+  depth: number;
+  from?: string;
+  to?: string;
+}
+
+interface OpeningMoveInfo {
+  move: string;
+  name: string;
+  description: string;
+  style?: string;
+}
+
 export const SYSTEM_PROMPTS = {
-  moveSelection: (persona: string, boardMap: string, semanticState: string, fen: string, processedCandidates: any[], openingContext: any, sessionGoal: string | null) => {
+  moveSelection: (
+    persona: string,
+    boardMap: string,
+    semanticState: string,
+    fen: string,
+    processedCandidates: CandidateMove[],
+    openingContext: OpeningMoveInfo[] | OpeningMoveInfo | null,
+    sessionGoal: string | null
+  ) => {
     return `You are a world-class chess coach with an ${persona} persona.
 Your goal is to guide the user through the game, providing high-level strategic advice and commentary.
 

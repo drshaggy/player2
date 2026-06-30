@@ -251,11 +251,11 @@ Never: skip a test, weaken an assertion, or commit with a failing verify.
 
 Sequenced so each step is independently shippable and the agent can verify as it goes.
 
-### Phase 1 — Foundations (no behavior change)
-1. **Add `verify` script + `typecheck` script.** Run it. Fix whatever breaks. Commit.
-2. **Delete `src/lib/prompts/index.js`** (dead duplicate). Update ARCHITECTURE.md. Commit.
-3. **Fix the broken openingBook tests** (remove self-mock). Make them pass against real code. Commit.
-4. **Audit all `*.test.ts`** for the self-mock anti-pattern. Fix or delete. Commit.
+### Phase 1 — Foundations (no behavior change) ✅
+1. **Add `verify` script + `typecheck` script.** Run it. Fix whatever breaks. Commit. ✅
+2. **Delete `src/lib/prompts/index.js`** (dead duplicate). Update ARCHITECTURE.md. Commit. ✅ (committed in `35ddb2c`)
+3. **Fix the broken openingBook tests** (remove self-mock). Make them pass against real code. Commit. ✅
+4. **Audit all `*.test.ts`** for the self-mock anti-pattern. Fix or delete. Commit. ✅ (no other instances found)
 
 ### Phase 2 — Architecture
 5. **Implement real `generateSemanticState`.** Add tests. Commit.
