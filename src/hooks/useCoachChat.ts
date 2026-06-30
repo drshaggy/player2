@@ -28,6 +28,8 @@ interface UseCoachChatArgs {
   createGame: () => Promise<void>;
   /** Shared ref the orchestrator also passes into useChessGame so makeAIMove can append messages. */
   setChatMessagesRef: React.MutableRefObject<React.Dispatch<React.SetStateAction<ChatMessage[]>> | null>;
+  /** Shared ref so useChessGame can toggle the typing indicator during makeAIMove. */
+  setIsTypingRef: React.MutableRefObject<React.Dispatch<React.SetStateAction<boolean>> | null>;
 }
 
 export function useCoachChat({
@@ -43,6 +45,7 @@ export function useCoachChat({
   updateCapturedPieces,
   createGame,
   setChatMessagesRef,
+  setIsTypingRef,
 }: UseCoachChatArgs) {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     { role: 'assistant', content: WELCOME_MESSAGE }
@@ -52,9 +55,10 @@ export function useCoachChat({
   const [isTyping, setIsTyping] = useState(false);
   const [gamePhase, setGamePhase] = useState<'consultation' | 'playing'>('consultation');
 
-  // Keep the shared ref pointed at the latest setter so useChessGame (created
-  // before this hook) can append AI commentary via the ref.
+  // Keep the shared refs pointed at the latest setters so useChessGame
+  // (created before this hook) can append AI commentary + toggle typing.
   setChatMessagesRef.current = setChatMessages;
+  setIsTypingRef.current = setIsTyping;
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });

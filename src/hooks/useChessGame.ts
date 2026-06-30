@@ -27,6 +27,7 @@ interface UseChessGameArgs {
   /** Cross-hook dependencies (chat hook is instantiated after this hook). */
   saveGameMove: (move: any) => Promise<void>;
   setChatMessagesRef: React.MutableRefObject<React.Dispatch<React.SetStateAction<ChatMessage[]>> | null>;
+  setIsTypingRef: React.MutableRefObject<React.Dispatch<React.SetStateAction<boolean>> | null>;
 }
 
 export function useChessGame({
@@ -37,6 +38,7 @@ export function useChessGame({
   sessionGoalRef,
   saveGameMove,
   setChatMessagesRef,
+  setIsTypingRef,
 }: UseChessGameArgs) {
   const chessGame = chessGameRef.current;
 
@@ -53,6 +55,7 @@ export function useChessGame({
     const possibleMoves = currentChessGame.moves();
     if (currentChessGame.isGameOver() || possibleMoves.length === 0) return;
 
+    setIsTypingRef.current?.(true);
     let httpStatus: number | undefined;
     try {
       const history = currentChessGame.history();
@@ -159,6 +162,8 @@ export function useChessGame({
       setMoveHistory(currentChessGame.history());
       updateCapturedPieces();
       alert("The AI coach encountered an error while thinking. Your move has been reverted. Please try again or reset the game.");
+    } finally {
+      setIsTypingRef.current?.(false);
     }
 
     if (boardInstanceRef.current) {

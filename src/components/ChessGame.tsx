@@ -27,6 +27,7 @@ export default function ChessGame() {
   const boardRef = useRef<HTMLDivElement>(null);
   const sessionGoalRef = useRef<string>("");
   const setChatMessagesRef = useRef<React.Dispatch<React.SetStateAction<{ role: 'user' | 'assistant'; content: string }[]>> | null>(null);
+  const setIsTypingRef = useRef<React.Dispatch<React.SetStateAction<boolean>> | null>(null);
   const applyRestoredStateRef = useRef<((data: RestoredState) => void) | null>(null);
 
   const [, setSessionGoal] = useState<string>("");
@@ -49,6 +50,7 @@ export default function ChessGame() {
     sessionGoalRef,
     saveGameMove: persistence.saveGameMove,
     setChatMessagesRef,
+    setIsTypingRef,
   });
 
   const chat = useCoachChat({
@@ -64,6 +66,7 @@ export default function ChessGame() {
     updateCapturedPieces: chess.updateCapturedPieces,
     createGame: persistence.createGame,
     setChatMessagesRef,
+    setIsTypingRef,
   });
 
   // Applied by useGamePersistence after restore loads + replays the game.
