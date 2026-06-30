@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps, react-hooks/refs */
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -70,49 +70,79 @@ export function useChessGame({
         openingContext = bookOptions;
       }
 
-      const candidates = await new Promise<{
-        move: string, from: string, to: string, score: string, depth: number
-      }[]>((resolve, reject) => {
-        const ws = new WebSocket('wss://chess-api.com/v1');
-        const gatheredCandidates: any[] = [];
-        const timeout = setTimeout(() => {
-          ws.close();
-          reject(new Error('Stockfish WebSocket timeout'));
-        }, 10000);
+      let candidates: { move: string, from: string, to: string, score: string, depth: number }[] = [];
+      try {
+        candidates = await new Promise<{
+          move: string, from: string, to: string, score: string, depth: number
+        }[]>((resolve, reject) => {
+          const ws = new WebSocket('wss://chess-api.com/v1');
+          const gatheredCandidates: any[] = [];
+          const timeout = setTimeout(() => {
+            ws.close();
+            reject(new Error('Stockfish WebSocket timeout'));
+          }, 10000);
 
-        ws.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          if (data.type === 'move' || data.type === 'bestmove') {
-            const candidate = {
-              move: data.san,
-              from: data.from,
-              to: data.to,
-              score: data.eval?.toString() || '0',
-              depth: data.depth || 0
-            };
-            const existingIdx = gatheredCandidates.findIndex(c => c.move === candidate.move);
-            if (existingIdx > -1) {
-              gatheredCandidates[existingIdx] = candidate;
-            } else {
-              gatheredCandidates.push(candidate);
+          ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'move' || data.type === 'bestmove') {
+              const candidate = {
+                move: data.san,
+                from: data.from,
+                to: data.to,
+                score: data.eval?.toString() || '0',
+                depth: data.depth || 0
+              };
+              const existingIdx = gatheredCandidates.findIndex(c => c.move === candidate.move);
+              if (existingIdx > -1) {
+                gatheredCandidates[existingIdx] = candidate;
+              } else {
+                gatheredCandidates.push(candidate);
+              }
+              if (data.type === 'bestmove') {
+                clearTimeout(timeout);
+                ws.close();
+                resolve(gatheredCandidates.slice(0, 3));
+              }
             }
-            if (data.type === 'bestmove') {
-              clearTimeout(timeout);
-              ws.close();
-              resolve(gatheredCandidates.slice(0, 3));
-            }
-          }
-        };
+          };
 
-        ws.onerror = () => {
-          clearTimeout(timeout);
-          reject(new Error('WebSocket error'));
-        };
+          ws.onerror = () => {
+            clearTimeout(timeout);
+            reject(new Error('WebSocket error'));
+          };
 
-        ws.onopen = () => {
-          ws.send(JSON.stringify({ fen: currentChessGame.fen(), variants: 3 }));
-        };
-      });
+          ws.onopen = () => {
+            ws.send(JSON.stringify({ fen: currentChessGame.fen(), variants: 3 }));
+          };
+        });
+      } catch (wsError) {
+        // Stockfish is unavailable — don't abort. Build fallback candidates
+        // from whatever we have so the game continues without engine eval.
+        // The pipeline will still merge Lichess master moves + book moves.
+        console.warn('Stockfish unavailable, using fallback candidates:', wsError instanceof Error ? wsError.message : wsError);
+      }
+
+      if (candidates.length === 0) {
+        // Fallback: use opening-book moves, then legal moves as last resort.
+        if (openingContext && openingContext.length > 0) {
+          candidates = openingContext.map(m => ({
+            move: m.move, from: '', to: '', score: '0.0 (Book)', depth: 0,
+          }));
+        } else {
+          // Generate a few candidate moves from legal moves (top by SAN sort
+          // for determinism). This is a last resort — no engine eval at all.
+          const legalMoves = currentChessGame.moves({ verbose: true }) as any[];
+          candidates = legalMoves.slice(0, 5).map(m => ({
+            move: m.san, from: m.from, to: m.to, score: '0.0 (fallback)', depth: 0,
+          }));
+        }
+      }
+
+      // Send UCI history so the pipeline can use the Lichess play-parameter
+      // endpoint (non-auth-gated) for master game lookups.
+      const verboseHistory = currentChessGame.history({ verbose: true }) as any[];
+      const uciHistory = verboseHistory
+        .map(m => m.from + m.to + (m.promotion ? m.promotion : ''));
 
       const response = await fetch("/api/move", {
         method: "POST",
@@ -121,7 +151,8 @@ export function useChessGame({
           fen: currentChessGame.fen(),
           candidates,
           openingContext,
-          sessionGoal: sessionGoalRef.current
+          sessionGoal: sessionGoalRef.current,
+          history: uciHistory,
         }),
       });
 
@@ -174,8 +205,10 @@ export function useChessGame({
         updateCapturedPieces();
         alert("The AI coach encountered an error after making its move. The AI's move has been reverted. Please try again or reset the game.");
       } else if (!isRetry && categorized.category === 'network') {
-        // Pre-move network error (e.g. Stockfish WebSocket timeout) —
-        // retry once after a short delay so the player's move isn't lost.
+        // Pre-move network error (e.g. /api/move fetch failure) — retry
+        // once after a short delay. Stockfish WebSocket failures are caught
+        // by the inner try/catch above and handled via fallback candidates,
+        // so they never reach this branch.
         shouldRetry = true;
       } else {
         if (boardInstanceRef.current) {
