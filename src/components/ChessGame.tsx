@@ -10,7 +10,7 @@ import { Chessboard, COLOR, INPUT_EVENT_TYPE } from 'cm-chessboard';
 import { Markers } from 'cm-chessboard/src/extensions/markers/Markers';
 import 'cm-chessboard/assets/chessboard.css';
 import { supabase } from '@/lib/supabase';
-import { getOpeningMove, getOpeningMoves } from '@/lib/openingBook';
+import { getOpeningMoves } from '@/lib/openingBook';
 
 export function handleChessInput(
   event: any, 
@@ -456,7 +456,7 @@ export default function ChessGame() {
       try {
         // 1. ALWAYS Check Opening Book options for EVERY turn
         const history = currentChessGame.history();
-        const bookOptions = getOpeningMoves(history, 'balanced');
+        const bookOptions = getOpeningMoves(history);
         
         let candidates = [];
         let openingContext = null;

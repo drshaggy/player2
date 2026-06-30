@@ -134,7 +134,7 @@ export const OPENING_BOOK: OpeningNode = {
   },
 };
 
-export function getOpeningMoves(history: string[], persona: string): OpeningMove[] {
+export function getOpeningMoves(history: string[]): OpeningMove[] {
   let currentNode = OPENING_BOOK;
   
   for (const move of history) {
@@ -150,15 +150,19 @@ export function getOpeningMoves(history: string[], persona: string): OpeningMove
     .map(c => c.moveInfo as OpeningMove);
 }
 
+// TODO(persona-rework, ENGINEERING_PLAN §7): The persona-based style matching
+// below is a placeholder. The canonical persona set is not yet defined, and
+// only 'aggressive' currently maps to a style. Callers pass 'balanced' which
+// always falls through to the first move. A full rework is deferred — do not
+// piecemeal-fix the map; wait for the dedicated track.
 export function getOpeningMove(history: string[], persona: string): OpeningMove | null {
-  const moves = getOpeningMoves(history, persona);
+  const moves = getOpeningMoves(history);
   if (moves.length === 0) return null;
 
-  // Try to find a move that matches the persona style
-  const styleMap: Record<string, string> = {
+  // Try to find a move that matches the persona style.
+  // NOTE: only 'aggressive' is wired; 'balanced' and other values fall through.
+  const styleMap: Record<string, OpeningMove['style']> = {
     'aggressive': 'aggressive',
-    'patient': 'solid',
-    'theoretical': 'theoretical'
   };
   
   const preferredStyle = styleMap[persona] || 'theoretical';

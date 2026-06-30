@@ -3,36 +3,36 @@ import { getOpeningMoves, getOpeningMove, OPENING_BOOK } from '@/lib/openingBook
 
 describe('getOpeningMoves', () => {
   it('returns all first-move options for an empty history (start of game)', () => {
-    const moves = getOpeningMoves([], 'balanced');
+    const moves = getOpeningMoves([]);
     expect(moves).toHaveLength(2);
     expect(moves.map(m => m.move)).toEqual(['e4', 'd4']);
   });
 
   it('returns Caro-Kann main line options after e4 c6', () => {
-    const moves = getOpeningMoves(['e4', 'c6'], 'balanced');
+    const moves = getOpeningMoves(['e4', 'c6']);
     expect(moves).toHaveLength(1);
     expect(moves[0].move).toBe('d4');
     expect(moves[0].name).toBe('Main Line');
   });
 
   it('returns Open Game responses after e4 e5', () => {
-    const moves = getOpeningMoves(['e4', 'e5'], 'balanced');
+    const moves = getOpeningMoves(['e4', 'e5']);
     expect(moves.map(m => m.move)).toEqual(['Nf3']);
   });
 
   it('returns Ruy Lopez and Italian Game responses after e4 e5 Nf3 Nc6', () => {
-    const moves = getOpeningMoves(['e4', 'e5', 'Nf3', 'Nc6'], 'balanced');
+    const moves = getOpeningMoves(['e4', 'e5', 'Nf3', 'Nc6']);
     expect(moves.map(m => m.move)).toEqual(['Bb5', 'Bc4']);
   });
 
   it('returns empty array when moving off book', () => {
     // White plays e4, Black plays c6, but White plays Nf3 instead of d4
-    const moves = getOpeningMoves(['e4', 'c6', 'Nf3'], 'balanced');
+    const moves = getOpeningMoves(['e4', 'c6', 'Nf3']);
     expect(moves).toEqual([]);
   });
 
   it('returns empty array for a deep non-book sequence', () => {
-    const moves = getOpeningMoves(['e4', 'c6', 'd4', 'd5', 'Nc3', 'dxe4', 'Nxe4', 'Nf6', 'Ng5', 'h6', 'Nxf7', 'Kxf7'], 'balanced');
+    const moves = getOpeningMoves(['e4', 'c6', 'd4', 'd5', 'Nc3', 'dxe4', 'Nxe4', 'Nf6', 'Ng5', 'h6', 'Nxf7', 'Kxf7']);
     expect(moves).toEqual([]);
   });
 });
