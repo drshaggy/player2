@@ -1,7 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps, @next/next/no-img-element */
-// TODO: Phase 2 (decomposition) — remove this disable and type the event
-// handlers + component state properly. This file is a 903-line god component
-// and piecemeal any-removal here is risky without the broader refactor.
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps, @next/next/no-img-element, react-hooks/refs */
+// TODO: Phase 3+ — further extract useChessGame / useCoachChat / useGamePersistence
+// hooks. The board state, AI move loop, chat, and persistence remain in this
+// orchestrator because they share tightly-coupled refs (chessGameRef,
+// boardInstanceRef, gameIdRef, sessionGoalRef). The presentational pieces
+// (Board, ChatPanel, MoveHistory, AuthBadge) and useAuth have been extracted.
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -11,12 +13,18 @@ import { Markers } from 'cm-chessboard/src/extensions/markers/Markers';
 import 'cm-chessboard/assets/chessboard.css';
 import { supabase } from '@/lib/supabase';
 import { getOpeningMoves } from '@/lib/openingBook';
+import { processFen } from '@/lib/utils/chess';
+import { useAuth } from '@/hooks/useAuth';
+import { AuthBadge } from '@/components/AuthBadge';
+import { Board } from '@/components/Board';
+import { ChatPanel } from '@/components/ChatPanel';
+import { MoveHistory } from '@/components/MoveHistory';
 
 export function handleChessInput(
-  event: any, 
-  chessGame: Chess, 
-  boardInstance: Chessboard | null, 
-  saveGameMove: (move: any) => Promise<void>, 
+  event: any,
+  chessGame: Chess,
+  boardInstance: Chessboard | null,
+  saveGameMove: (move: any) => Promise<void>,
   makeAIMove: () => Promise<void>,
   setMoveHistory: (history: string[]) => void,
   updateCapturedPieces: () => void
@@ -33,13 +41,11 @@ export function handleChessInput(
     return moves.length > 0;
   } else if (event.type === INPUT_EVENT_TYPE.validateMoveInput) {
     const move = { from: event.squareFrom, to: event.squareTo, promotion: 'q' };
-    
-    // Check if the move is legal before applying it to the state
+
     const movesFromSquare = chessGame.moves({ square: event.squareFrom, verbose: true });
-    const isLegal = movesFromSquare.some(m => m.to === event.squareTo);
+    const isLegal = movesFromSquare.some((m: any) => m.to === event.squareTo);
 
     if (!isLegal) {
-      // Use a tiny delay to ensure the board's internal state is ready for a reset
       setTimeout(() => {
         event.chessboard.setPosition(chessGame.fen());
       }, 0);
@@ -49,17 +55,17 @@ export function handleChessInput(
     let result;
     try {
       result = chessGame.move(move);
-    } catch (e) {
+    } catch {
       result = null;
     }
-    
+
     if (result) {
       event.chessboard.setPosition(chessGame.fen());
       setMoveHistory(chessGame.history());
       updateCapturedPieces();
-      
+
       saveGameMove(result);
-      
+
       if (chessGame.turn() === 'b') {
         setTimeout(() => {
           makeAIMove();
@@ -69,7 +75,7 @@ export function handleChessInput(
                 ev, chessGame, boardInstance, saveGameMove, makeAIMove, setMoveHistory, updateCapturedPieces
               ), COLOR.white);
             }
-          } catch (e) {
+          } catch {
             console.warn("Input already enabled");
           }
         }, 500);
@@ -83,6 +89,8 @@ export function handleChessInput(
   }
 }
 
+const WELCOME_MESSAGE = "Welcome! Before we start this session, tell me: what's our goal for today? Do you want to practice a specific opening, work on your end-game, or just have me be an absolute menace on the board?";
+
 export default function ChessGame() {
   const boardRef = useRef<HTMLDivElement>(null);
   const boardInstanceRef = useRef<Chessboard | null>(null);
@@ -92,54 +100,22 @@ export default function ChessGame() {
   const [chessPosition, setChessPosition] = useState(chessGame.fen());
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [capturedPieces, setCapturedPieces] = useState<Record<string, string[]>>({ w: [], b: [] });
-  const [coachCommentary, setCoachCommentary] = useState<string>("");
-  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([
-    { role: 'assistant', content: "Welcome! Before we start this session, tell me: what's our goal for today? Do you want to practice a specific opening, work on your end-game, or just have me be an absolute menace on the board?" }
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([
+    { role: 'assistant', content: WELCOME_MESSAGE }
   ]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [chatInput, setChatInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const [opponent, setOpponent] = useState<any>(null);
   const [gameId, setGameId] = useState<string | null>(null);
   const [gamePhase, setGamePhase] = useState<'consultation' | 'playing'>('consultation');
   const [sessionGoal, setSessionGoal] = useState<string>("");
 
-  function processFen(fen: string): string {
-    const fields = fen.trim().split(' ');
-    if (fields.length === 1) {
-      return `${fen.trim()} w KQkq - 0 1`;
-    } else if (fields.length < 6) {
-      const defaultFields = ['w', 'KQkq', '-', '0', '1'];
-      const padding = defaultFields.slice(fields.length - (6 - fields.length));
-      return [...fields, ...padding].join(' ');
-    }
-    return fen.trim();
-  }
-
-  const userRef = useRef<any>(null);
   const opponentRef = useRef<any>(null);
   const gameIdRef = useRef<string | null>(null);
   const sessionGoalRef = useRef<string>("");
 
-  useEffect(() => {
-    // Check current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const u = session?.user ?? null;
-      setUser(u);
-      userRef.current = u;
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const u = session?.user ?? null;
-      setUser(u);
-      userRef.current = u;
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
+  const { user, userRef, handleLogin, handleLogout } = useAuth();
 
   useEffect(() => {
     async function fetchCoach() {
@@ -154,42 +130,15 @@ export default function ChessGame() {
     fetchCoach();
   }, []);
 
-  async function handleLogin() {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
-      if (error) {
-        console.error("signInWithOAuth error:", error);
-        alert(`Login error: ${error.message}`);
-      }
-    } catch (err) {
-      console.error("Login exception:", err);
-      alert(`Unexpected error: ${err}`);
-    }
-  }
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-  }
-
   async function saveGameMove(move: any) {
     const currentUser = userRef.current;
     const currentOpponent = opponentRef.current;
     let currentGameId = gameIdRef.current;
     const currentChessGame = chessGameRef.current;
 
-    console.log('saveGameMove called. User:', currentUser?.id, 'Opponent:', currentOpponent?.id, 'Current GameId:', currentGameId);
-    if (!currentUser || !currentOpponent) {
-      console.warn('saveGameMove aborted: missing user or opponent');
-      return;
-    }
-    
+    if (!currentUser || !currentOpponent) return;
+
     if (!currentGameId) {
-      console.log('Creating new game in Supabase...');
       const { data: game, error } = await supabase
         .from('games')
         .insert({
@@ -206,14 +155,12 @@ export default function ChessGame() {
         console.error('Error creating game:', error);
         return;
       }
-      console.log('Game created successfully. ID:', game.id);
       currentGameId = game.id;
       gameIdRef.current = game.id;
       setGameId(game.id);
     }
 
-    console.log('Saving move to moves table. GameId:', currentGameId, 'Move:', move.san);
-    const { error: moveError } = await supabase
+    await supabase
       .from('moves')
       .insert({
         game_id: currentGameId,
@@ -223,118 +170,245 @@ export default function ChessGame() {
         fen_after: currentChessGame.fen(),
       });
 
-    if (moveError) console.error('Error saving move:', moveError);
-
-    console.log('Updating game FEN. GameId:', currentGameId);
     await supabase
       .from('games')
       .update({ current_fen: currentChessGame.fen() })
       .eq('id', currentGameId);
   }
 
-    async function handleSendMessage() {
-      if (!chatInput.trim()) return;
-      const trimmedInput = chatInput.trim();
-      console.log("handleSendMessage triggered. Input:", trimmedInput);
+  function updateCapturedPieces() {
+    const currentFen = chessGame.fen();
+    const pieces: Record<string, string[]> = { w: [], b: [] };
+    const startingPieces = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 };
+    const counts: Record<'w' | 'b', Record<string, number>> = {
+      w: { ...startingPieces },
+      b: { ...startingPieces }
+    };
 
-      // Check if message is a valid FEN string
-      const isFen = trimmedInput.includes('/') && (trimmedInput.length > 10);
-      console.log("isFen evaluation:", isFen);
+    const boardPart = currentFen.split(' ')[0];
+    const pieceRegex = /[pnbrqkPNBRQK]/g;
+    let match;
+    while ((match = pieceRegex.exec(boardPart)) !== null) {
+      const char = match[0];
+      const color = char === char.toUpperCase() ? 'w' : 'b';
+      const type = char.toLowerCase();
+      counts[color][type]--;
+    }
 
-      if (isFen && gamePhase === 'consultation') {
-        console.log("FEN input detected:", trimmedInput);
-        const processedFen = processFen(trimmedInput);
-        try {
-          console.log("Attempting to load processed FEN:", processedFen);
-          chessGame.load(processedFen);
-          if (boardInstanceRef.current) {
-            boardInstanceRef.current.setPosition(processedFen);
-          }
-          setChessPosition(processedFen);
-          updateCapturedPieces();
-          setChatMessages(prev => [...prev, { role: 'user' as const, content: trimmedInput }, { role: 'assistant' as const, content: "Position updated! I've set the board. What's the goal for this position?" }]);
-          setChatInput("");
-          return;
-        } catch (e) {
-          console.error("CRITICAL FEN ERROR:", {
-            input: trimmedInput,
-            processed: processedFen,
-            error: e
-          });
-          // Let it proceed to chat
+    Object.entries(counts).forEach(([color, piecesCount]) => {
+      Object.entries(piecesCount).forEach(([type, count]) => {
+        for (let i = 0; i < count; i++) {
+          pieces[color].push(type);
         }
+      });
+    });
+
+    setCapturedPieces(pieces);
+  }
+
+  async function makeAIMove() {
+    const currentChessGame = chessGameRef.current;
+    const possibleMoves = currentChessGame.moves();
+    if (currentChessGame.isGameOver() || possibleMoves.length === 0) return;
+
+    try {
+      const history = currentChessGame.history();
+      const bookOptions = getOpeningMoves(history);
+      let openingContext: ReturnType<typeof getOpeningMoves> | null = null;
+
+      if (bookOptions && bookOptions.length > 0) {
+        openingContext = bookOptions;
       }
 
-      // 1. Get the current session token for the API request
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      const candidates = await new Promise<{
+        move: string, from: string, to: string, score: string, depth: number
+      }[]>((resolve, reject) => {
+        const ws = new WebSocket('wss://chess-api.com/v1');
+        const gatheredCandidates: any[] = [];
+        const timeout = setTimeout(() => {
+          ws.close();
+          reject(new Error('Stockfish WebSocket timeout'));
+        }, 10000);
 
-      if (!token) {
-        alert("Please log in to chat with the coach.");
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          if (data.type === 'move' || data.type === 'bestmove') {
+            const candidate = {
+              move: data.san,
+              from: data.from,
+              to: data.to,
+              score: data.eval?.toString() || '0',
+              depth: data.depth || 0
+            };
+            const existingIdx = gatheredCandidates.findIndex(c => c.move === candidate.move);
+            if (existingIdx > -1) {
+              gatheredCandidates[existingIdx] = candidate;
+            } else {
+              gatheredCandidates.push(candidate);
+            }
+            if (data.type === 'bestmove') {
+              clearTimeout(timeout);
+              ws.close();
+              resolve(gatheredCandidates.slice(0, 3));
+            }
+          }
+        };
+
+        ws.onerror = () => {
+          clearTimeout(timeout);
+          reject(new Error('WebSocket error'));
+        };
+
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ fen: currentChessGame.fen(), variants: 3 }));
+        };
+      });
+
+      const response = await fetch("/api/move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fen: currentChessGame.fen(),
+          candidates,
+          openingContext,
+          sessionGoal: sessionGoalRef.current
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.move) {
+        let move;
+        if (data.move.from && data.move.to) {
+          move = currentChessGame.move({
+            from: data.move.from,
+            to: data.move.to,
+            promotion: data.move.promotion || 'q',
+          });
+        } else if (data.move.san) {
+          move = currentChessGame.move(data.move.san);
+        }
+
+        if (move) await saveGameMove(move);
+
+        if (gameIdRef.current && data.commentary) {
+          const aiMsg = { role: 'assistant' as const, content: data.commentary };
+          setChatMessages(prev => [...prev, aiMsg]);
+          await supabase
+            .from('game_chat')
+            .insert({ game_id: gameIdRef.current, role: 'assistant', content: data.commentary });
+        }
+      } else {
+        throw new Error('No move from AI Coach');
+      }
+    } catch (error) {
+      console.error("AI Move error:", error);
+      currentChessGame.undo();
+      if (boardInstanceRef.current) {
+        boardInstanceRef.current.setPosition(currentChessGame.fen());
+      }
+      setChessPosition(currentChessGame.fen());
+      setMoveHistory(currentChessGame.history());
+      updateCapturedPieces();
+      alert("The AI coach encountered an error while thinking. Your move has been reverted. Please try again or reset the game.");
+    }
+
+    if (boardInstanceRef.current) {
+      boardInstanceRef.current.setPosition(currentChessGame.fen());
+    }
+    setChessPosition(currentChessGame.fen());
+    setMoveHistory(currentChessGame.history());
+    updateCapturedPieces();
+  }
+
+  async function handleSendMessage() {
+    if (!chatInput.trim()) return;
+    const trimmedInput = chatInput.trim();
+
+    const isFen = trimmedInput.includes('/') && (trimmedInput.length > 10);
+
+    if (isFen && gamePhase === 'consultation') {
+      const processedFenStr = processFen(trimmedInput);
+      try {
+        chessGame.load(processedFenStr);
+        if (boardInstanceRef.current) {
+          boardInstanceRef.current.setPosition(processedFenStr);
+        }
+        setChessPosition(processedFenStr);
+        updateCapturedPieces();
+        setChatMessages(prev => [...prev,
+        { role: 'user' as const, content: trimmedInput },
+        { role: 'assistant' as const, content: "Position updated! I've set the board. What's the goal for this position?" }
+        ]);
+        setChatInput("");
         return;
+      } catch {
+        // proceed to chat
       }
+    }
 
-      const message = trimmedInput;
-      setChatInput("");
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
 
-    
+    if (!token) {
+      alert("Please log in to chat with the coach.");
+      return;
+    }
+
+    const message = trimmedInput;
+    setChatInput("");
+
     const userMsg = { role: 'user' as const, content: message };
     setChatMessages(prev => [...prev, userMsg]);
 
     try {
       setIsTyping(true);
-      
+
       if (gamePhase === 'consultation') {
-        // CONSULTATION PHASE: Handle setup
         const response = await fetch("/api/chat", {
           method: "POST",
-          headers: { 
+          headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`
           },
-          body: JSON.stringify({ 
-            gameId: 'consultation', // Special ID for setup phase
+          body: JSON.stringify({
+            gameId: 'consultation',
             fen: chessGameRef.current.fen(),
             message: message,
             persona: 'balanced'
           }),
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
-        
+
         if (data.content) {
           const aiMsg = { role: 'assistant' as const, content: data.content };
           setChatMessages(prev => [...prev, aiMsg]);
-          
-            if (data.suggestedFen) {
-              const processedFen = processFen(data.suggestedFen);
-              chessGame.load(processedFen);
-              if (boardInstanceRef.current) {
-                boardInstanceRef.current.setPosition(processedFen);
-              }
-              setChessPosition(processedFen);
-              updateCapturedPieces();
+
+          if (data.suggestedFen) {
+            const processedFenStr = processFen(data.suggestedFen);
+            chessGame.load(processedFenStr);
+            if (boardInstanceRef.current) {
+              boardInstanceRef.current.setPosition(processedFenStr);
             }
+            setChessPosition(processedFenStr);
+            updateCapturedPieces();
+          }
 
-
-          // If the AI indicates the consultation is complete or the user has set a goal,
-          // we can transition to the 'playing' phase. 
-          // For now, we'll let the coach decide or look for a signal in the response.
           if (data.transitionToGame) {
             setGamePhase('playing');
             setSessionGoal(data.sessionGoal || '');
             sessionGoalRef.current = data.sessionGoal || '';
-            
-            // Now actually create the game in Supabase
+
             const currentUser = userRef.current;
             const currentOpponent = opponentRef.current;
             if (currentUser && currentOpponent) {
-              const { data: game, error } = await supabase
+              const { data: game } = await supabase
                 .from('games')
                 .insert({
                   white_player_id: currentUser.id,
@@ -345,7 +419,7 @@ export default function ChessGame() {
                 })
                 .select()
                 .single();
-              
+
               if (game) {
                 setGameId(game.id);
                 gameIdRef.current = game.id;
@@ -364,25 +438,25 @@ export default function ChessGame() {
         } else {
           const response = await fetch("/api/chat", {
             method: "POST",
-            headers: { 
+            headers: {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${token}`
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
               gameId: gameIdRef.current,
               fen: chessGameRef.current.fen(),
               message: message,
               persona: 'balanced'
             }),
           });
-          
+
           if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
           }
 
           const data = await response.json();
-          
+
           if (data.content) {
             const aiMsg = { role: 'assistant' as const, content: data.content };
             setChatMessages(prev => [...prev, aiMsg]);
@@ -396,207 +470,6 @@ export default function ChessGame() {
     }
   }
 
-  function getPieceImage(piece: string, color: 'w' | 'b') {
-    const pieceMap: Record<string, string> = {
-      p: 'p',
-      n: 'n',
-      b: 'b',
-      r: 'r',
-      q: 'q',
-      k: 'k',
-    };
-    const pieceType = pieceMap[piece] || 'p';
-    const url = `/assets/images/chess/${color}${pieceType}.svg`;
-    console.log(`Loading captured piece: ${url}`);
-    return url;
-  }
-
-  function updateCapturedPieces() {
-    const currentFen = chessGame.fen();
-    const pieces: Record<string, string[]> = { w: [], b: [] };
-    
-    // Initial pieces for each color
-    const startingPieces = {
-      p: 8, n: 2, b: 2, r: 2, q: 1, k: 1
-    };
-    
-    const counts: Record<'w' | 'b', Record<string, number>> = {
-      w: { ...startingPieces },
-      b: { ...startingPieces }
-    };
-
-    // Count pieces currently on board from FEN
-    const boardPart = currentFen.split(' ')[0];
-    const pieceRegex = /[pnbrqkPNBRQK]/g;
-    let match;
-    while ((match = pieceRegex.exec(boardPart)) !== null) {
-      const char = match[0];
-      const color = char === char.toUpperCase() ? 'w' : 'b';
-      const type = char.toLowerCase();
-      counts[color][type]--;
-    }
-
-    // Convert counts to a list of captured pieces
-    Object.entries(counts).forEach(([color, piecesCount]) => {
-      Object.entries(piecesCount).forEach(([type, count]) => {
-        for (let i = 0; i < count; i++) {
-          pieces[color].push(type);
-        }
-      });
-    });
-
-    setCapturedPieces(pieces);
-  }
-
-  async function makeAIMove() {
-    const currentChessGame = chessGameRef.current;
-    const possibleMoves = currentChessGame.moves();
-    if (currentChessGame.isGameOver() || possibleMoves.length === 0) return;
-
-      try {
-        // 1. ALWAYS Check Opening Book options for EVERY turn
-        const history = currentChessGame.history();
-        const bookOptions = getOpeningMoves(history);
-        
-        let candidates = [];
-        let openingContext = null;
-
-        if (bookOptions && bookOptions.length > 0) {
-          openingContext = bookOptions;
-        } else {
-          console.log("No opening book options for current history:", history);
-        }
-
-
-      // 2. Use WebSocket to get Multi-PV candidates from Stockfish
-      candidates = await new Promise<{
-        move: string,
-        from: string,
-        to: string,
-        score: string,
-        depth: number
-      }[]>((resolve, reject) => {
-        const ws = new WebSocket('wss://chess-api.com/v1');
-        const gatheredCandidates: any[] = [];
-        
-        const timeout = setTimeout(() => {
-          ws.close();
-          reject(new Error('Stockfish WebSocket timeout'));
-        }, 10000);
-
-        ws.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          
-          if (data.type === 'move' || data.type === 'bestmove') {
-            const candidate = {
-              move: data.san,
-              from: data.from,
-              to: data.to,
-              score: data.eval?.toString() || '0',
-              depth: data.depth || 0
-            };
-            
-            const existingIdx = gatheredCandidates.findIndex(c => c.move === candidate.move);
-            if (existingIdx > -1) {
-              gatheredCandidates[existingIdx] = candidate;
-            } else {
-              gatheredCandidates.push(candidate);
-            }
-
-            if (data.type === 'bestmove') {
-              clearTimeout(timeout);
-              ws.close();
-              resolve(gatheredCandidates.slice(0, 3));
-            }
-          }
-        };
-
-        ws.onerror = (err) => {
-          clearTimeout(timeout);
-          reject(err);
-        };
-
-        ws.onopen = () => {
-          ws.send(JSON.stringify({ 
-            fen: currentChessGame.fen(),
-            variants: 3 
-          }));
-        };
-      });
-
-      // 3. Request persona-based selection and commentary from our API
-      const response = await fetch("/api/move", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          fen: currentChessGame.fen(),
-          candidates,
-          persona: 'balanced',
-          openingContext,
-          sessionGoal: sessionGoalRef.current // Use Ref to avoid stale state closures
-        }),
-      });
-      
-      const data = await response.json();
-      console.log("AI Coach Response <-", data);
-
-        if (data.move) {
-          let move;
-          if (data.move.from && data.move.to) {
-            move = currentChessGame.move({
-              from: data.move.from,
-              to: data.move.to,
-              promotion: data.move.promotion || 'q',
-            });
-          } else if (data.move.san) {
-            move = currentChessGame.move(data.move.san);
-          }
-          
-          if (move) await saveGameMove(move);
-          setCoachCommentary(data.commentary);
-
-
-        // PERSIST AI COMMENTARY TO CHAT
-        if (gameIdRef.current && data.commentary) {
-          const aiMsg = { role: 'assistant' as const, content: data.commentary };
-          setChatMessages(prev => [...prev, aiMsg]);
-          
-          await supabase
-            .from('game_chat')
-            .insert({
-              game_id: gameIdRef.current,
-              role: 'assistant',
-              content: data.commentary,
-            });
-        }
-      } else {
-        throw new Error('No move from AI Coach');
-      }
-    } catch (error) {
-      console.error("AI Move error:", error);
-      
-      // UNDO PLAYER MOVE: If the AI fails to respond or the API errors out, 
-      // undo the move the player just made so they aren't stuck and can try again.
-      currentChessGame.undo(); 
-      if (boardInstanceRef.current) {
-        boardInstanceRef.current.setPosition(currentChessGame.fen());
-      }
-      setChessPosition(currentChessGame.fen());
-      setMoveHistory(currentChessGame.history());
-      updateCapturedPieces();
-      
-      alert("The AI coach encountered an error while thinking. Your move has been reverted. Please try again or reset the game.");
-    }
-    
-    if (boardInstanceRef.current) {
-      boardInstanceRef.current.setPosition(currentChessGame.fen());
-    }
-    setChessPosition(currentChessGame.fen());
-    setMoveHistory(currentChessGame.history());
-    updateCapturedPieces();
-  }
-
-
   async function inputHandler(event: any) {
     return handleChessInput(
       event,
@@ -609,110 +482,97 @@ export default function ChessGame() {
     );
   }
 
-    useEffect(() => {
-      let intervalId: NodeJS.Timeout;
-      async function restoreGame() {
-        if (!user || !opponent) return;
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    async function restoreGame() {
+      if (!user || !opponent) return;
 
-        console.log('Attempting to restore game for user:', user.id, 'and opponent:', opponent.id);
+      const { data: games, error } = await supabase
+        .from('games')
+        .select('*')
+        .eq('white_player_id', user.id)
+        .eq('black_player_id', opponent.id)
+        .eq('status', 'ongoing')
+        .order('created_at', { ascending: false });
 
-        const { data: games, error } = await supabase
-          .from('games')
-          .select('*')
-          .eq('white_player_id', user.id)
-          .eq('black_player_id', opponent.id)
-          .eq('status', 'ongoing')
-          .order('created_at', { ascending: false });
+      if (error) {
+        console.error('Error restoring game:', error);
+        return;
+      }
 
-        if (error) {
-          console.error('Error restoring game:', error);
-          return;
+      const game = games?.[0];
+
+      if (game) {
+        setGameId(game.id);
+        gameIdRef.current = game.id;
+        setGamePhase('playing');
+
+        if (game.session_goal) {
+          setSessionGoal(game.session_goal);
+          sessionGoalRef.current = game.session_goal;
         }
 
-        const game = games?.[0];
+        const { data: moveHistoryData } = await supabase
+          .from('moves')
+          .select('move_san')
+          .eq('game_id', game.id)
+          .order('move_number', { ascending: true });
 
-          if (game) {
-            console.log('Found active game:', game.id, 'with FEN:', game.current_fen);
-            setGameId(game.id);
-            gameIdRef.current = game.id;
-            setGamePhase('playing');
-            
-            if (game.session_goal) {
-              setSessionGoal(game.session_goal);
-              sessionGoalRef.current = game.session_goal;
+        if (moveHistoryData) {
+          const sanHistory = moveHistoryData.map((m: any) => m.move_san);
+          chessGame.reset();
+          for (const san of sanHistory) {
+            try {
+              chessGame.move(san);
+            } catch {
+              console.error(`Failed to replay move ${san}`);
             }
-          
-           // Restore move history from moves table
-           const { data: moveHistoryData } = await supabase
-             .from('moves')
-             .select('move_san')
-             .eq('game_id', game.id)
-             .order('move_number', { ascending: true });
-
-           if (moveHistoryData) {
-             const sanHistory = moveHistoryData.map(m => m.move_san);
-             console.log('Replaying move history:', sanHistory);
-             
-             // Reset and replay moves to rebuild internal chess.js history
-             chessGame.reset();
-             for (const san of sanHistory) {
-               try {
-                 chessGame.move(san);
-               } catch (e) {
-                 console.error(`Failed to replay move ${san}:`, e);
-               }
-             }
-             setMoveHistory(sanHistory);
-           } else {
-             // Fallback to FEN if no moves found
-             chessGame.load(game.current_fen);
-             setMoveHistory(chessGame.history());
-           }
-           
-           setChessPosition(chessGame.fen());
-           updateCapturedPieces();
-
-           // Restore chat history
-           const { data: chatHistory } = await supabase
-             .from('game_chat')
-             .select('role, content')
-             .eq('game_id', game.id)
-             .order('created_at', { ascending: true });
-           
-           if (chatHistory) {
-             setChatMessages(chatHistory.map((m: any) => ({
-               role: m.role,
-               content: m.content
-             })));
-           }
-
-          let attempts = 0;
-          intervalId = setInterval(() => {
-            if (boardInstanceRef.current) {
-              console.log('Board instance found, setting position');
-              boardInstanceRef.current.setPosition(game.current_fen);
-              clearInterval(intervalId);
-            } else {
-              attempts++;
-              if (attempts > 50) {
-                console.warn('Board instance not found after 5 seconds');
-                clearInterval(intervalId);
-              }
-            }
-          }, 100);
+          }
+          setMoveHistory(sanHistory);
         } else {
-          console.log('No active game found');
+          chessGame.load(game.current_fen);
+          setMoveHistory(chessGame.history());
         }
-      }
 
-      if (user && opponent) {
-        restoreGame();
-      }
+        setChessPosition(chessGame.fen());
+        updateCapturedPieces();
 
-      return () => {
-        if (intervalId) clearInterval(intervalId);
-      };
-    }, [user, opponent]);
+        const { data: chatHistory } = await supabase
+          .from('game_chat')
+          .select('role, content')
+          .eq('game_id', game.id)
+          .order('created_at', { ascending: true });
+
+        if (chatHistory) {
+          setChatMessages(chatHistory.map((m: any) => ({
+            role: m.role,
+            content: m.content
+          })));
+        }
+
+        let attempts = 0;
+        intervalId = setInterval(() => {
+          if (boardInstanceRef.current) {
+            boardInstanceRef.current.setPosition(game.current_fen);
+            clearInterval(intervalId);
+          } else {
+            attempts++;
+            if (attempts > 50) {
+              clearInterval(intervalId);
+            }
+          }
+        }, 100);
+      }
+    }
+
+    if (user && opponent) {
+      restoreGame();
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [user, opponent]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -731,171 +591,63 @@ export default function ChessGame() {
     }
   }, []);
 
+  async function handleNewGame() {
+    const oldGameId = gameIdRef.current;
+
+    chessGameRef.current = new Chess();
+    const newFen = chessGameRef.current.fen();
+    if (boardInstanceRef.current) {
+      boardInstanceRef.current.setPosition(newFen);
+    }
+    setChessPosition(newFen);
+    setMoveHistory([]);
+    setCapturedPieces({ w: [], b: [] });
+    setChatMessages([{ role: 'assistant', content: WELCOME_MESSAGE }]);
+    setGameId(null);
+    gameIdRef.current = null;
+    setGamePhase('consultation');
+    setSessionGoal("");
+
+    if (oldGameId) {
+      await supabase
+        .from('games')
+        .update({ status: 'finished' })
+        .eq('id', oldGameId);
+    }
+  }
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-900 text-white p-4">
-      <div className="absolute top-4 right-4">
-        {user ? (
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-zinc-400">Logged in as {user.email}</span>
-            <button 
-              onClick={handleLogout}
-              className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-xs transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        ) : (
-          <button 
-            onClick={handleLogin}
-            className="px-4 py-2 bg-white text-black rounded-md font-medium hover:bg-zinc-200 transition-colors flex items-center gap-2"
-          >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-4 h-4" />
-            Login with Google
-          </button>
-        )}
-      </div>
+      <AuthBadge user={user} onLogin={handleLogin} onLogout={handleLogout} />
       <h1 className="text-4xl font-bold mb-8">Player 2: Your AI Chess Coach</h1>
-      
-       <div className="flex flex-col md:flex-row gap-8 items-start justify-center w-full max-w-screen-xl">
-         <div className="flex flex-row gap-6 items-start justify-center w-full max-w-[300px] h-[600px] mt-[90px]">
-           <div className="flex flex-col w-full max-w-[300px] h-full bg-zinc-800 rounded-lg p-4 shadow-xl border border-zinc-700">
-             <h2 className="text-xl font-semibold mb-4 border-b border-zinc-700 pb-2">Move History</h2>
-             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-               <div className="grid grid-cols-2 gap-2 font-mono text-sm">
-                 {Array.from({ length: Math.ceil(moveHistory.length / 2) }).map((_, i) => (
-                   <div key={i} className="contents">
-                     <div className="flex items-center gap-2 p-1 border-b border-zinc-700/50">
-                       <span className="text-zinc-500 w-6">{i + 1}.</span>
-                       <span>{moveHistory[i * 2]}</span>
-                     </div>
-                     <div className="flex items-center gap-2 p-1 border-b border-zinc-700/50">
-                       {moveHistory[i * 2 + 1] ? <span>{moveHistory[i * 2 + 1]}</span> : <span className="text-zinc-600">...</span>}
-                     </div>
-                   </div>
-                 ))}
-               </div>
-             </div>
-           </div>
-         </div>
 
-         <div className="flex flex-col gap-4 items-center">
-            <div className="flex justify-center gap-1 h-8 text-2xl">
-              {capturedPieces.b.map((p, i) => (
-                <img 
-                  key={i} 
-                  src={getPieceImage(p, 'b')} 
-                  alt={p} 
-                  className="w-6 h-6 opacity-80" 
-                />
-              ))}
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1 bg-zinc-800 rounded-full text-xs font-medium text-zinc-400 border border-zinc-700 shrink-0">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              Playing against {opponent?.username || 'Loading...'}
-            </div>
-               <div className="relative shadow-2xl border-8 border-zinc-800 rounded-lg overflow-hidden w-[600px] h-[600px] aspect-square">
-                 {gamePhase === 'consultation' && (
-                   <div className="absolute inset-0 z-10 bg-zinc-900/80 backdrop-blur-sm flex items-center justify-center p-8 text-center">
-                     <div>
-                       <h3 className="text-2xl font-bold mb-4">Pre-Game Consultation</h3>
-                       <p className="text-zinc-400 mb-6">Chat with your coach to set the goals for this session before the board opens.</p>
-                       <div className="text-sm text-zinc-500 animate-bounce">Check the chat window &rarr;</div>
-                     </div>
-                   </div>
-                 )}
-                 <div ref={boardRef} className="w-full h-full" />
-               </div>
- 
- 
-            <div className="flex justify-center gap-1 h-8 text-2xl">
-              {capturedPieces.w.map((p, i) => (
-                <img 
-                  key={i} 
-                  src={getPieceImage(p, 'w')} 
-                  alt={p} 
-                  className="w-6 h-6 opacity-80" 
-                />
-              ))}
-            </div>
- 
-         </div>
- 
- <div className="flex flex-1 flex-col h-[600px] mt-[90px]">
-               <div className="flex flex-col w-full h-full bg-zinc-800 rounded-lg p-4 shadow-xl border border-zinc-700">
-                <h2 className="text-xl font-semibold mb-4 border-b border-zinc-700 pb-2">Coach&apos;s Voice</h2>
-               <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar mb-4 space-y-3">
-                 {chatMessages.length === 0 && <div className="text-zinc-500 italic text-sm">No conversation yet...</div>}
-                 {chatMessages.map((msg, i) => (
-                   <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                     <div className={`max-w-[80%] p-2 rounded-lg text-sm ${
-                       msg.role === 'user' 
-                         ? 'bg-blue-600 text-white rounded-tr-none' 
-                         : 'bg-zinc-700 text-zinc-200 rounded-tl-none'
-                     }`}>
-                       {msg.content}
-                     </div>
-                   </div>
-                 ))}
-                  {isTyping && <div className="text-zinc-500 text-xs italic animate-pulse">Coach is thinking...</div>}
-                  <div ref={chatEndRef} />
-                </div>
-                <div className="flex gap-2 mt-auto">
-                 <input 
-                   type="text" 
-                   value={chatInput}
-                   onChange={(e) => setChatInput(e.target.value)}
-                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                   placeholder="Ask a question..."
-                   className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
-                 />
-                 <button 
-                   onClick={handleSendMessage}
-                   className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm font-medium transition-colors"
-                 >
-                   Send
-                 </button>
-               </div>
-             </div>
-           </div>
+      <div className="flex flex-col md:flex-row gap-8 items-start justify-center w-full max-w-screen-xl">
+        <MoveHistory moveHistory={moveHistory} />
 
+        <Board
+          boardRef={boardRef}
+          gamePhase={gamePhase}
+          capturedPieces={capturedPieces}
+          opponent={opponent}
+        />
+
+        <ChatPanel
+          chatMessages={chatMessages}
+          isTyping={isTyping}
+          chatInput={chatInput}
+          onChatInputChange={setChatInput}
+          onSend={handleSendMessage}
+          chatEndRef={chatEndRef}
+        />
       </div>
 
       <div className="mt-8 flex gap-4">
-          <button 
-            onClick={async () => {
-              const oldGameId = gameIdRef.current;
-
-               // 1. Reset local state
-               chessGameRef.current = new Chess();
-               const newFen = chessGameRef.current.fen();
-               if (boardInstanceRef.current) {
-                 boardInstanceRef.current.setPosition(newFen);
-               }
-               setChessPosition(newFen);
-               setMoveHistory([]);
-               setCapturedPieces({ w: [], b: [] });
-               setChatMessages([
-    { role: 'assistant', content: "Welcome back! Before we start this session, tell me: what's our goal for today? Do you want to practice a specific opening, work on your end-game, or just have me be an absolute menace on the board?" }
-               ]);
-               setGameId(null);
-               gameIdRef.current = null;
-               setCoachCommentary("");
-               setGamePhase('consultation');
-               setSessionGoal("");
-
-
-              // 2. Mark old game as finished in Supabase to prevent it from being restored
-              if (oldGameId) {
-                await supabase
-                  .from('games')
-                  .update({ status: 'finished' })
-                  .eq('id', oldGameId);
-              }
-            }}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-md font-medium transition-colors"
-          >
-            New Game
-          </button>
+        <button
+          onClick={handleNewGame}
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-md font-medium transition-colors"
+        >
+          New Game
+        </button>
         <div className="px-6 py-2 bg-zinc-800 rounded-md font-mono text-sm">
           FEN: {chessPosition.slice(0, 20)}...
         </div>
@@ -903,5 +655,3 @@ export default function ChessGame() {
     </div>
   );
 }
-
-

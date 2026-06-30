@@ -73,8 +73,7 @@ function detectPhase(fen: string, white: Record<string, number>, black: Record<s
     return 'opening';
   }
 
-  // Endgame: queens off or very few major pieces, low pawn count.
-  const totalPawns = white.p + black.p;
+  // Endgame: queens off or very few major pieces.
   if (majorPieces <= 4 || (white.q === 0 && black.q === 0 && majorPieces <= 6)) {
     return 'endgame';
   }
