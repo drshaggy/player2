@@ -63,6 +63,7 @@ export default function ChessGame() {
     sessionGoalRef,
     makeAIMove: chess.makeAIMove,
     setChessPosition: chess.setChessPosition,
+    setMoveHistory: chess.setMoveHistory,
     updateCapturedPieces: chess.updateCapturedPieces,
     createGame: persistence.createGame,
     setChatMessagesRef,

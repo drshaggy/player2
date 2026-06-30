@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LLM_CONFIG } from '@/lib/config/llm';
 import { createClient } from '@supabase/supabase-js';
+import { detectMentionedOpening, findPopularLine, type LinePosition } from '@/lib/consultation/openingLineFinder';
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,6 +42,26 @@ export async function POST(req: NextRequest) {
 
       // 3. Handle Consultation Phase specially
       if (gameId === 'consultation') {
+        // If the player mentions a known opening, query the Lichess masters
+        // explorer for its most popular main line and present the LLM with a
+        // menu of White-to-move positions at increasing depth (start of
+        // opening, then each Black reply deeper). The LLM — not this code —
+        // decides which depth matches the player's phrasing ("play caro kann"
+        // = start, "caro kann middle game" = deep), with Lichess providing
+        // the concrete legal positions + frequencies so the LLM never
+        // fabricates a FEN.
+        let validFens: LinePosition[] = [];
+        let fenDirective = '';
+        const spine = detectMentionedOpening(message);
+        if (spine) {
+          const line = await findPopularLine(spine);
+          if (line && line.positions.length > 0) {
+            validFens = line.positions;
+            const menu = line.positions.map((p, i) => `${i}. ${p.label} — FEN: ${p.fen}`).join('\n');
+            fenDirective = `\n\nThe player wants to play the ${line.openingName}. The Lichess masters database provides its most popular main line. Below are White-to-move positions at increasing depth along that line (all side-to-move 'w'). Pick the one that best matches the player's intent: if they just named the opening ("play caro kann"), choose the START; if they asked for the middle game / a deeper point ("caro kann middle game", "after a few moves"), choose a deeper position. You MUST emit the EXACT FEN you chose (copy verbatim, do not invent or modify) as the SET_FEN, then include TRANSITION_TO_GAME with a goal summarizing the player's request.\n\nAvailable positions:\n${menu}\n`;
+          }
+        }
+
         const consultationPrompt = `You are a world-class chess coach with an ${persona} persona.
 You are currently in the "Consultation Phase" with a player. 
 Your goal is to help the player define a specific objective for this session.
@@ -51,7 +72,7 @@ Crucially, a partial FEN (piece placement only) is NOT acceptable; it must be a 
 The SET_FEN command must be on its own line or clearly separated so it can be parsed. Do not wrap it in other text on the same line if possible.
 
 IMPORTANT - SIDE TO MOVE: The human player is ALWAYS White and moves first. The FEN's side-to-move field (the 2nd field) MUST be 'w' (White to move). Never emit a FEN where it is Black's turn. If the requested scenario would naturally have Black to move (e.g. a position after Black's reply, or "let me defend the Sicilian as Black"), instead return the position ONE PLY EARLIER — the position before Black's move — so that it becomes White's turn and the player can make the next move. If you cannot express the scenario with White to move, do not emit a SET_FEN at all; instead describe the position in words and ask the player how they'd like to proceed.
-
+${fenDirective}
 Once they have clearly stated a goal (or you have suggested a position that fulfills their request), you MUST include the exact phrase 'TRANSITION_TO_GAME' in your response, followed by a summary of the goal they chose.
 
 
@@ -100,24 +121,41 @@ Keep it conversational and a bit edgy.`;
            const cleanedContent = aiContent.replace(/SET_FEN:\s*(?:\S+\s+){5}\S+/g, '').trim();
 
  
-          if (cleanedContent.includes('TRANSITION_TO_GAME')) {
-            const parts = cleanedContent.split('TRANSITION_TO_GAME');
-            const finalContent = parts[0].trim();
-            const goalPart = parts[1] || '';
-            const sessionGoal = goalPart.replace(/Goal:/i, '').trim();
+         if (cleanedContent.includes('TRANSITION_TO_GAME')) {
+           const parts = cleanedContent.split('TRANSITION_TO_GAME');
+           const finalContent = parts[0].trim();
+           const goalPart = parts[1] || '';
+           const sessionGoal = goalPart.replace(/Goal:/i, '').trim();
+
+           // Validate the LLM's chosen FEN against the precomputed menu of
+           // legal White-to-move positions. The LLM decides the depth; this
+           // guard ensures it picked a real position (not a hallucination).
+           // If it didn't, fall back to the start of the opening (shallowest,
+           // safest White-to-move position), or to the LLM's own FEN if no
+           // opening menu was computed.
+           let transitionFen = suggestedFen;
+           let transitionLine: string[] | null = null;
+           if (validFens.length > 0) {
+             const match = validFens.find(p => p.fen === suggestedFen);
+             const chosen = match ?? validFens[0];
+             transitionFen = chosen.fen;
+             transitionLine = chosen.line;
+           }
+
+           return NextResponse.json({ 
+             content: finalContent, 
+             transitionToGame: true, 
+             sessionGoal: sessionGoal,
+             suggestedFen: transitionFen,
+             suggestedLine: transitionLine
+           });
+         }
  
-            return NextResponse.json({ 
-              content: finalContent, 
-              transitionToGame: true, 
-              sessionGoal: sessionGoal,
-              suggestedFen: suggestedFen
-            });
-          }
- 
-          return NextResponse.json({ 
-            content: cleanedContent, 
-            suggestedFen: suggestedFen 
-          });
+         return NextResponse.json({ 
+           content: cleanedContent, 
+           suggestedFen: suggestedFen,
+           suggestedLine: null
+         });
       }
 
       // 4. Standard Game Chat Phase

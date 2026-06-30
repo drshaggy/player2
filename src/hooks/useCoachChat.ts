@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { Chess } from 'chess.js';
+import { Chess } from 'chess.js';
 import type { Chessboard } from 'cm-chessboard';
 import { supabase } from '@/lib/supabase';
 import { processFen } from '@/lib/utils/chess';
@@ -24,6 +24,7 @@ interface UseCoachChatArgs {
   sessionGoalRef: React.MutableRefObject<string>;
   makeAIMove: () => Promise<void>;
   setChessPosition: (fen: string) => void;
+  setMoveHistory: (history: string[]) => void;
   updateCapturedPieces: () => void;
   createGame: () => Promise<void>;
   /** Shared ref the orchestrator also passes into useChessGame so makeAIMove can append messages. */
@@ -42,6 +43,7 @@ export function useCoachChat({
   sessionGoalRef,
   makeAIMove,
   setChessPosition,
+  setMoveHistory,
   updateCapturedPieces,
   createGame,
   setChatMessagesRef,
@@ -135,11 +137,22 @@ export function useCoachChat({
 
           if (data.suggestedFen) {
             const processedFenStr = processFen(data.suggestedFen);
-            chessGameRef.current.load(processedFenStr);
+            if (data.suggestedLine && Array.isArray(data.suggestedLine) && data.suggestedLine.length > 0) {
+              // Replay the SAN line from the start position so chess.js
+              // history is populated (move history display + opening book
+              // lookups + move numbering all depend on it).
+              chessGameRef.current = new Chess();
+              for (const san of data.suggestedLine) {
+                try { chessGameRef.current.move(san); } catch { break; }
+              }
+            } else {
+              chessGameRef.current.load(processedFenStr);
+            }
             if (boardInstanceRef.current) {
               boardInstanceRef.current.setPosition(processedFenStr);
             }
             setChessPosition(processedFenStr);
+            setMoveHistory(chessGameRef.current.history());
             updateCapturedPieces();
           }
 

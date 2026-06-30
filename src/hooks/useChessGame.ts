@@ -50,13 +50,15 @@ export function useChessGame({
     setCapturedPieces(computeCapturedPieces(chessGameRef.current.fen()));
   }
 
-  async function makeAIMove() {
+  async function makeAIMove(isRetry = false) {
     const currentChessGame = chessGameRef.current;
     const possibleMoves = currentChessGame.moves();
     if (currentChessGame.isGameOver() || possibleMoves.length === 0) return;
 
     setIsTypingRef.current?.(true);
     let httpStatus: number | undefined;
+    let aiMoveApplied = false;
+    let shouldRetry = false;
     try {
       const history = currentChessGame.history();
       const bookOptions = history.length > 0
@@ -138,7 +140,10 @@ export function useChessGame({
           move = currentChessGame.move(data.move.san);
         }
 
-        if (move) await saveGameMove(move);
+        if (move) {
+          aiMoveApplied = true;
+          await saveGameMove(move);
+        }
 
         if (gameIdRef.current && data.commentary) {
           const aiMsg = { role: 'assistant' as const, content: data.commentary };
@@ -156,16 +161,40 @@ export function useChessGame({
         httpStatus: categorized.httpStatus,
         raw: error,
       });
-      currentChessGame.undo();
-      if (boardInstanceRef.current) {
-        boardInstanceRef.current.setPosition(currentChessGame.fen());
+      // Only undo if the AI's move was actually applied to the game. If the
+      // error happened BEFORE the AI moved (WebSocket timeout, LLM error),
+      // undoing would revert the PLAYER's last move — don't do that.
+      if (aiMoveApplied) {
+        currentChessGame.undo();
+        if (boardInstanceRef.current) {
+          boardInstanceRef.current.setPosition(currentChessGame.fen());
+        }
+        setChessPosition(currentChessGame.fen());
+        setMoveHistory(currentChessGame.history());
+        updateCapturedPieces();
+        alert("The AI coach encountered an error after making its move. The AI's move has been reverted. Please try again or reset the game.");
+      } else if (!isRetry && categorized.category === 'network') {
+        // Pre-move network error (e.g. Stockfish WebSocket timeout) —
+        // retry once after a short delay so the player's move isn't lost.
+        shouldRetry = true;
+      } else {
+        if (boardInstanceRef.current) {
+          boardInstanceRef.current.setPosition(currentChessGame.fen());
+        }
+        setChessPosition(currentChessGame.fen());
+        setMoveHistory(currentChessGame.history());
+        updateCapturedPieces();
+        alert("The AI coach couldn't respond. Please try again or start a new game.");
       }
-      setChessPosition(currentChessGame.fen());
-      setMoveHistory(currentChessGame.history());
-      updateCapturedPieces();
-      alert("The AI coach encountered an error while thinking. Your move has been reverted. Please try again or reset the game.");
     } finally {
-      setIsTypingRef.current?.(false);
+      if (!shouldRetry) {
+        setIsTypingRef.current?.(false);
+      }
+    }
+
+    if (shouldRetry) {
+      setTimeout(() => makeAIMove(true), 2000);
+      return;
     }
 
     if (boardInstanceRef.current) {
