@@ -172,18 +172,13 @@ export function useGamePersistence({
 
       if (moveHistoryData) {
         sanHistory = moveHistoryData.map((m: any) => m.move_san);
-        chessGame.reset();
-        for (const san of sanHistory) {
-          try {
-            chessGame.move(san);
-          } catch {
-            console.error(`Failed to replay move ${san}`);
-          }
-        }
-      } else {
-        chessGame.load(game.current_fen);
-        sanHistory = chessGame.history();
       }
+
+      // Load the persisted FEN directly instead of reset()+replay. Games
+      // started from a consultation FEN (custom position) can't be replayed
+      // from the standard starting position, and the moves table already
+      // gives us the SAN history — no replay needed.
+      chessGame.load(game.current_fen);
 
       const { data: chatHistory } = await supabase
         .from('game_chat')
