@@ -39,12 +39,16 @@ See `ENGINEERING_PLAN.md §4` for the full three-tier strategy.
 | Tier | Vercel target | Supabase | Notes |
 |---|---|---|---|
 | Local | — | `supabase start` | ephemeral, seeded |
-| Preview | per-branch | `player2-staging` (shared) | throwaway data; isolated from prod |
-| Production | `main` | prod project | never push directly to `main` |
+| Preview | per-branch | self-hosted on `supabase.percy.network` (percy.network) | shared throwaway DB; see `docs/self-hosting-setup.md` |
+| Production | `main` | cloud project (`zdfscobeyhohhvgylhbh`) | never push directly to `main` |
 
-**Branch workflow:** branch → PR → Vercel auto-creates a Preview pointed at staging Supabase → run `npm run verify` + smoke-test the preview → squash-merge to `main`.
+**Branch workflow:** branch → PR → Vercel auto-creates a Preview pointed at the self-hosted Supabase on percy.network → run `npm run verify` + smoke-test the preview → squash-merge to `main`.
 
-**DB migrations:** create with `supabase migration new <name>`, test locally, commit. After merge to `main`, re-run `supabase db push` against staging so previews stay in sync.
+**DB migrations:** create with `supabase migration new <name>`, test locally, commit. After merge to `main`, push to the self-hosted instance so previews stay in sync (see `docs/self-hosting-setup.md §7`):
+```sh
+DB_URL="postgres://postgres.your-tenant-id:<pwd>@supabase.percy.network:5432/postgres"
+supabase db push --db-url "$DB_URL"
+```
 
 ## Learn More
 

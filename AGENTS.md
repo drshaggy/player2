@@ -5,7 +5,7 @@
 - **ARCHITECTURE.md**
 - **ENGINEERING_PLAN.md** - Architecture, testing harness, and deployment strategy (Phases 1-3 complete; Phase 4 in progress)
 - **DYNAMIC_FEN_PLAN.md**
-- **docs/staging-setup.md** - Step-by-step staging Supabase project creation (Phase 4 step 15, manual)
+- **docs/self-hosting-setup.md** - Self-hosting Supabase on percy.network (Phase 4 step 15, replaced paid staging project)
 - **Update all Docs**  - When asked to update all docs, all .md files 
 - Add new md files to this list so you know to read them 
 
