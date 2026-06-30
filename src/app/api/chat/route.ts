@@ -89,12 +89,15 @@ Keep it conversational and a bit edgy.`;
  
           let suggestedFen = null;
           if (aiContent.includes('SET_FEN:')) {
-            const fenMatch = aiContent.match(/SET_FEN:\s*([^\s\n\r]+)/);
+            // A FEN has exactly 6 space-separated fields. [^\s]+ only captures
+            // the first field (piece placement), leaking "w KQkq - 0 1" into
+            // the chat message.
+            const fenMatch = aiContent.match(/SET_FEN:\s*((?:\S+\s+){5}\S+)/);
             if (fenMatch) {
               suggestedFen = fenMatch[1];
             }
           }
-           const cleanedContent = aiContent.replace(/SET_FEN:\s*[^\s\n\r]+/g, '').trim();
+           const cleanedContent = aiContent.replace(/SET_FEN:\s*(?:\S+\s+){5}\S+/g, '').trim();
 
  
           if (cleanedContent.includes('TRANSITION_TO_GAME')) {
