@@ -164,16 +164,16 @@ Vercel Preview deployments share production env vars by default, so a preview UR
 
 ### 4.2 Solution: Three-tier environments
 
-**Decision (free Supabase tier):** use a separate staging Supabase project for previews. Branching is documented as the future upgrade path but not the current approach.
+**Staging backend is DEFERRED (see §4.4).** For now only the local and production tiers are wired. The original plan (separate staging Supabase project) and a self-hosted prototype were both ruled out — see §4.4 and §8.1 for why. Until a staging backend is decided, develop against local Supabase and smoke-test via `npm run dev`.
 
 ```
-LOCAL  →  PREVIEW (per-branch)        →  PRODUCTION
- ↑              ↑                            ↑
-local Supabase  staging Supabase project      prod Supabase
-(ephemeral)     (shared across all previews)  (shared)
+LOCAL  →  [ PREVIEW (per-branch) — DEFERRED ]  →  PRODUCTION
+  ↑              ↑                                    ↑
+local Supabase  staging backend TBD (§4.4)           prod cloud project
+(ephemeral)     (not currently wired)                 (zdfscobeyhohhvgylhbh)
 ```
 
-> Note: Vercel Preview URLs will share the staging DB across branches. This is acceptable because staging data is throwaway and isolated from prod. Per-branch DB isolation requires Supabase Branching (paid plan) — see §4.4.
+> Note: do NOT point Vercel Preview env vars at the production cloud project — previews must not mutate prod data. Until a staging backend exists, Preview URLs are unwired on the DB side.
 
 ### 4.3 Tier 1 — Local Supabase (for the agent + dev)
 

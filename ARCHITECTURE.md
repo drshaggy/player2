@@ -43,7 +43,7 @@ src/lib/utils/
 - **Frontend/Backend**: Next.js (App Router), TypeScript, Tailwind CSS.
 - **Database**: Supabase (PostgreSQL).
 - **Chess Logic**: `chess.js`, `cm-chessboard` (board UI).
-- **Testing**: Vitest (with JSDOM). Playwright installed but not yet wired up (Phase 3).
+- **Testing**: Vitest (unit/component/scenario, with JSDOM + Testing Library + jest-dom) + Playwright E2E (opt-in, `npm run test:e2e`, against local Supabase). See `ENGINEERING_PLAN.md` Phase 3 for the full harness.
 
 ## Key Workflows
 - **Goal Alignment**: If a user sets a goal (e.g., "Caro-Kann"), the system filters the opening book, identifies the move `c6`, finds `c6` in the Stockfish candidates, and forces the LLM to select that index.
