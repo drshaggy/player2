@@ -1,12 +1,16 @@
 # Engineering Plan: Architecture, Testing Harness, and Deployment Strategy
 
-**Status:** Proposed
+**Status:** Phases 1-2 complete. Phase 3 (testing harness) is next.
 **Audience:** Future coding agents (small model) and human contributors.
 **Goal:** Shore up the architecture so a small model can safely iterate, build a testing harness that catches real bugs (not just happy paths), and stop deploying to production to test changes.
+
+> **Resume note:** The codebase is in a working state — `npm run verify` passes (36 tests, typecheck, lint), `npm run build` succeeds, and `npm run dev` returns HTTP 200. Phase 3 starts at step 9 below.
 
 ---
 
 ## 1. Current State Summary
+
+> This section described the state at plan creation. Phases 1-2 have since resolved items 1-4, 6, and partially 5. Items 7 remains (Phase 4). See §6 for per-step status.
 
 ### What works
 - Hybrid AI pipeline (opening book → Lichess masters → Stockfish candidates → LLM pick) is sound in concept.
@@ -14,18 +18,14 @@
 - Collocated Vitest unit tests exist for the move API, opening book, board utils, Lichess service, and prompts.
 - Vercel production deployment is functional.
 
-### What's brittle (high-risk for a small model to touch)
-1. **`ChessGame.tsx` is a 903-line god component** handling auth, board rendering, chat, AI moves, persistence, restoration, FEN parsing, and UI. Any change risks collateral damage.
-2. **Stubs masquerading as features:**
-   - `generateSemanticState` (`src/lib/utils/board.ts:28`) always returns `"The board is in a mid-game state. Material is equal."` — the LLM is fed misinformation.
-   - `getOpeningMove` persona matching (`src/lib/openingBook.ts:153`) maps `'patient'` but callers pass `'balanced'`, so style matching always falls through to `moves[0]`.
-3. **Tests that test mocks, not code:**
-   - `src/lib/openingBook.test.ts:4` mocks `@/lib/openingBook` then imports `getOpeningMoves` from the same module — the assertions validate the mock's return value, not real behavior.
-   - `src/lib/openingBook.test.ts:27` asserts `bookOptions` is `null` after `mockReturnValue(null)`, but `getOpeningMoves` returns `[]` (never `null`) — the test only passes because it's testing the mock.
-4. **Silent failure masking:** `route.ts:145` falls back to `processedCandidates[0]` on a bad LLM index. This hides LLM hallucinations rather than surfacing them.
-5. **No E2E tests.** Playwright is installed (`@playwright/test`) but unused. `tests/` is an empty directory.
-6. **No type check or lint gate.** `npm run test` runs but `npm run lint` / `tsc --noEmit` is never enforced before push.
-7. **Deployment = production.** Vercel Preview deployments inherit production env vars, so they hit the production Supabase DB. There is no staging environment.
+### What was brittle (now resolved unless noted)
+1. **`ChessGame.tsx` is a 903-line god component** — RESOLVED (Phase 2.8): decomposed to 657 lines with `Board`, `ChatPanel`, `MoveHistory`, `AuthBadge`, `useAuth`, and `chess.ts` utils extracted. Further hook extraction deferred.
+2. **Stubs masquerading as features** — RESOLVED (Phase 2.5, 2.6): `generateSemanticState` now does real phase/material analysis; `getOpeningMove` persona param is honest with a TODO (full rework deferred to §7).
+3. **Tests that test mocks, not code** — RESOLVED (Phase 1.3, 1.4): `openingBook.test.ts` rewritten to test real code; all test files audited.
+4. **Silent failure masking** — RESOLVED (Phase 2.7): `/api/move` returns 422 with debug payload on bad index, no fallback.
+5. **No E2E tests** — STILL OPEN (Phase 3.5): Playwright installed but unused. `tests/e2e/.gitkeep` placeholder exists.
+6. **No type check or lint gate** — RESOLVED (Phase 1.1): `npm run verify` is the single gate.
+7. **Deployment = production** — STILL OPEN (Phase 4): Vercel Previews still hit prod Supabase. Staging project planned.
 
 ---
 
@@ -57,19 +57,16 @@ src/hooks/
 - **`generateSemanticState`**: Implement real phase detection (count pieces → opening/middlegame/endgame) and material balance (pawn-weighed piece counts). Pure function, trivially testable.
 - **`getOpeningMove` persona param:** The persona values (`'balanced'` / `'aggressive'` / `'solid'`) are placeholders and the matching map is broken (maps `'patient'`, never passed). **Persona rework is deferred** (see §7) — for now, do not invest in fixing the map piecemeal. Either drop the unused parameter or leave it as a no-op pass-through, and add a `TODO` pointing to the deferred persona-rework track. Do not pretend the current values are canonical.
 
-### 2.3 Remove silent failure paths
+### 2.3 Remove silent failure paths ✅
+- `route.ts:145`: When `selectedMoveIndex` is out of range, return a 422 with the LLM's raw response in the error payload so the agent can see what went wrong. Do not fall back to move #1. **Done (Phase 2.7).**
+- `ChessGame.tsx:576`: The "undo player move on AI failure" path is good UX but swallows the error type. Log the error category (network / LLM / parse) so the agent can diagnose. **Deferred** — still logs the raw error; category tagging deferred to Phase 3 testing harness.
 
-- `route.ts:145`: When `selectedMoveIndex` is out of range, return a 422 with the LLM's raw response in the error payload so the agent can see what went wrong. Do not fall back to move #1.
-- `ChessGame.tsx:576`: The "undo player move on AI failure" path is good UX but swallows the error type. Log the error category (network / LLM / parse) so the agent can diagnose.
+### 2.4 Consolidate prompts ✅
+- `src/lib/prompts/index.js` and `index.ts` both existed. Deleted the `.js` file (Phase 1.2, commit `35ddb2c`). ARCHITECTURE.md updated to reference `index.ts`.
 
-### 2.4 Consolidate prompts
-
-- `src/lib/prompts/index.js` and `index.ts` both exist. Delete the `.js` file. ARCHITECTURE.md references the `.js` — update the doc.
-
-### 2.5 Type safety
-
-- Add `tsc --noEmit` as a script: `"typecheck": "tsc --noEmit"`.
-- Enforce `strict: true` (already on) — remove `any` from `ChessGame.tsx` event handlers via a proper `ChessboardInputEvent` type.
+### 2.5 Type safety ✅
+- Added `tsc --noEmit` as `npm run typecheck` (Phase 1.1). Included in `npm run verify`.
+- Enforce `strict: true` (already on) — `ChessGame.tsx` still has `any` on event handlers (scoped `eslint-disable` with TODO); will be cleaned up when remaining hooks are extracted (deferred). `route.ts`, `chat/route.ts`, `prompts/index.ts`, `lichess.ts` all `any`-free.
 
 ---
 
@@ -263,7 +260,7 @@ Sequenced so each step is independently shippable and the agent can verify as it
 7. **Remove silent index fallback in `route.ts`.** Return 422 with debug payload. Update test. Commit. ✅
 8. **Decompose `ChessGame.tsx`** into hooks + components. Keep behavior identical. E2E test must still pass. Commit in slices (one extraction per commit). ✅ (907→657 lines; extracted useAuth + AuthBadge + Board + ChatPanel + MoveHistory + chess utils; remaining logic deferred to future slice)
 
-### Phase 3 — Testing harness
+### Phase 3 — Testing harness (NEXT)
 9. **Add `src/__fixtures__/`** with FENs and recorded API responses. Commit.
 10. **Build the scenario harness** (`movePipeline.ts` + scenarios + test). Commit.
 11. **Add component tests** for decomposed components. Commit.

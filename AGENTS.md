@@ -3,7 +3,7 @@
 ## Documentation
 - **AGENTS.md** - Update this file with commands and rules specific to this project
 - **ARCHITECTURE.md**
-- **ENGINEERING_PLAN.md** - Architecture, testing harness, and deployment strategy
+- **ENGINEERING_PLAN.md** - Architecture, testing harness, and deployment strategy (Phases 1-2 complete; Phase 3 next)
 - **DYNAMIC_FEN_PLAN.md**
 - **Update all Docs**  - When asked to update all docs, all .md files 
 - Add new md files to this list so you know to read them 
@@ -13,36 +13,68 @@
 - **Tech Stack**: Next.js (App Router), TypeScript, Tailwind CSS, Supabase.
 - **Key Libraries**: 
   - `chess.js`: Handles chess game logic, move validation, and FEN/PGN generation.
-  - `chessground`: Provides the visual chessboard UI (Lichess engine).
+  - `cm-chessboard`: Provides the visual chessboard UI. Lacks official types — `src/types/cm-chessboard.d.ts` is a shim.
 
 ## Development Commands
-- **Run Development Server**: `cd player2 && npm run dev`
-- **Build Project**: `cd player2 && npm run build`
-- **Run Tests**: `cd player2 && npm run test`
+- **Run Development Server**: `npm run dev`
+- **Build Project**: `npm run build`
+- **Run Tests**: `npm run test`
+- **Watch Tests**: `npm run test:watch`
+- **Typecheck**: `npm run typecheck`
+- **Lint**: `npm run lint`
+- **Verify (all-in-one gate)**: `npm run verify` — runs typecheck + lint + test. Run this before declaring any task complete.
 - **Supabase**: Use the Supabase MCP Server
+
+## Verification Protocol (for agents)
+Before completing any task:
+1. `npm run verify` (typecheck + lint + unit tests)
+2. If touching DB: `supabase db reset && npm run test:e2e` (E2E not yet wired — Phase 3)
+3. If touching UI: smoke-test the relevant flow in the browser via `npm run dev`
+Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix the root cause.
+
+## Testing Conventions
+- Pure functions: collocated `*.test.ts`, exhaustive cases.
+- API routes: mock `fetch` (LLM + Lichess + Supabase), test status codes and response shapes.
+- Components: `*.test.tsx` with Testing Library, test behavior not implementation (Phase 3).
+- Fixtures will live in `src/__fixtures__/` (Phase 3). Never inline magic FENs in tests.
+- E2E tests live in `tests/e2e/` and run against local Supabase only (Phase 3).
+- Never mock the module under test — mock at the boundaries (fetch, external services).
 
 ## Tooling
 - **CLI Tools Available**: `vercel`, `cloudflare`, `gh`, `vitest`
-- When unit tests fail, ALWAYS fix the root course. Never skip the failing test, or coerce the test to pass. Never change the test, escalate to the user if it is genuinely broken
+- When unit tests fail, ALWAYS fix the root cause. Never skip the failing test, or coerce the test to pass. Never change the test, escalate to the user if it is genuinely broken.
 
 ## Database Schema
 - `profiles`: Users and AI bots (`is_bot` flag, `bot_style`, `difficulty_level`).
 - `games`: Current match state (`current_fen`, `current_turn`, `status`).
 - `moves`: Chronological move history linked to games.
+- `game_chat`: Chat messages linked to games.
 - **Auth**: Integrated with Supabase Auth; automatic profile creation via PG trigger.
+- **RLS**: Source of truth is `supabase/migrations/20260629100103_rls_policies.sql`.
 
 ## Deployment (Vercel)
 - **Production URL**: https://player2-drab.vercel.app
-- **Required Env Vars**:
+- **Required Env Vars** (see `.env.example`):
   - `NEXT_PUBLIC_SUPABASE_URL`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   - `SUPABASE_SERVICE_ROLE_KEY`
   - `LLM_API_KEY`
+  - `LLM_ENDPOINT` (optional, defaults to Cerebras)
+  - `LLM_MODEL` (optional, defaults to gemma-4-31b)
 - **Deployment Command**: `vercel --prod`
+- **Preview deployments**: Currently share production env vars. Staging Supabase project planned (Phase 4, ENGINEERING_PLAN §4.4).
 - **Known Build Fixes**: 
-  - `cm-chessboard` requires a custom TypeScript declaration file (`src/types/cm-chessboard.d.ts`) because it lacks official types.
-  - Use named imports for `Chessboard` from `cm-chessboard`.
-  - dynamic indexing of state objects (like `capturedPieces`) requires explicit `Record<string, T>` typing to pass Vercel's build-time type checking.
+  - `src/app/page.tsx` uses `export const dynamic = 'force-dynamic'` because `ChessGame` eagerly creates a Supabase client at module load.
+  - `cm-chessboard` requires a custom TypeScript declaration file (`src/types/cm-chessboard.d.ts`).
+  - `ChessGame.tsx` has a scoped `eslint-disable` for `any`/`exhaustive-deps`/`react-hooks/refs` — to be cleaned up when the remaining game logic is extracted into hooks (deferred).
+
+## Architecture Summary (post-Phase 2)
+- `ChessGame.tsx` (657 lines) is the orchestrator: game state, AI move loop, persistence, chat, restoration. Further extraction into `useChessGame` / `useCoachChat` / `useGamePersistence` hooks is deferred.
+- Presentational components extracted: `Board`, `ChatPanel`, `MoveHistory`, `AuthBadge`.
+- `useAuth` hook extracted.
+- Pure helpers in `src/lib/utils/chess.ts` (`getPieceImage`, `processFen`).
+- AI pipeline: opening book → Lichess masters → Stockfish candidates → LLM pick (with 422 on bad index, no silent fallback).
+- `generateSemanticState` is real (phase detection + material balance), not a stub.
 
 ## Current Progress
 - [x] Project initialized with Next.js, TS, Tailwind.
@@ -55,3 +87,8 @@
 - [x] Implement iterative Opening Book lookup to support multi-turn opening goals.
 - [x] Integrate Lichess Masters Database for theory-based move suggestions.
 - [x] Deployed to Vercel and configured environment variables.
+- [x] ENGINEERING_PLAN Phase 1 — Foundations (verify harness, fixed broken tests, lint cleanup).
+- [x] ENGINEERING_PLAN Phase 2 — Architecture (real `generateSemanticState`, persona cleanup, 422 on bad index, decomposed `ChessGame.tsx`).
+- [x] Unblocked local dev + production build (`.env.local` fix, `force-dynamic`).
+- [ ] ENGINEERING_PLAN Phase 3 — Testing harness (fixtures, scenario pipeline, component tests, E2E).
+- [ ] ENGINEERING_PLAN Phase 4 — Deployment isolation (staging Supabase, seed, PR template).
