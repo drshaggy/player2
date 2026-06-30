@@ -7,6 +7,13 @@ vi.mock('@/lib/services/lichess', () => ({
   getMasterOpeningMoves: vi.fn(),
 }));
 
+vi.mock('@/lib/config/llm', () => ({
+  LLM_CONFIG: {
+    endpoint: 'https://test-llm.example.com/v1/chat/completions',
+    model: 'test-model',
+  },
+}));
+
 vi.mock('@/lib/prompts/index', () => ({
   SYSTEM_PROMPTS: {
     moveSelection: vi.fn().mockReturnValue('mocked system prompt'),
@@ -34,7 +41,7 @@ describe('POST /api/move body readability', () => {
     ]);
 
     global.fetch = vi.fn().mockImplementation((url) => {
-      if (typeof url === 'string' && url.includes('api.cerebras.ai')) {
+      if (typeof url === 'string' && url.includes('test-llm.example.com')) {
         return Promise.resolve({
           ok: true,
           json: async () => ({

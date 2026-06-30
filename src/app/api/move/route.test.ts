@@ -6,6 +6,13 @@ vi.mock('@/lib/services/lichess', () => ({
   getMasterOpeningMovesByFen: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock('@/lib/config/llm', () => ({
+  LLM_CONFIG: {
+    endpoint: 'https://test-llm.example.com/v1/chat/completions',
+    model: 'test-model',
+  },
+}));
+
 vi.mock('next/server', async () => {
   const actual = await vi.importActual('next/server');
   return {

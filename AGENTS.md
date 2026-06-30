@@ -71,8 +71,8 @@ Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix 
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   - `SUPABASE_SERVICE_ROLE_KEY`
   - `LLM_API_KEY`
-  - `LLM_ENDPOINT` (optional, defaults to Cerebras)
-  - `LLM_MODEL` (optional, defaults to gemma-4-31b)
+  - `LLM_ENDPOINT` (required)
+  - `LLM_MODEL` (required)
 - **Deployment Command**: `vercel --prod`
 - **Preview deployments**: Currently share production env vars. Staging Supabase project planned (Phase 4, ENGINEERING_PLAN §4.4).
 - **Known Build Fixes**: 
