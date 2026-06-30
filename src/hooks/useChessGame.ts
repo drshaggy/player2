@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { getOpeningMoves } from '@/lib/openingBook';
 import { computeCapturedPieces } from '@/lib/utils/chess';
 import { handleChessInput } from '@/lib/utils/boardInput';
+import { categorizeAiMoveError } from '@/lib/utils/errorCategorize';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -52,6 +53,7 @@ export function useChessGame({
     const possibleMoves = currentChessGame.moves();
     if (currentChessGame.isGameOver() || possibleMoves.length === 0) return;
 
+    let httpStatus: number | undefined;
     try {
       const history = currentChessGame.history();
       const bookOptions = getOpeningMoves(history);
@@ -116,6 +118,7 @@ export function useChessGame({
         }),
       });
 
+      httpStatus = response.status;
       const data = await response.json();
 
       if (data.move) {
@@ -143,7 +146,11 @@ export function useChessGame({
         throw new Error('No move from AI Coach');
       }
     } catch (error) {
-      console.error("AI Move error:", error);
+      const categorized = categorizeAiMoveError(error, httpStatus);
+      console.error(`AI Move error [${categorized.category}]:`, categorized.message, {
+        httpStatus: categorized.httpStatus,
+        raw: error,
+      });
       currentChessGame.undo();
       if (boardInstanceRef.current) {
         boardInstanceRef.current.setPosition(currentChessGame.fen());

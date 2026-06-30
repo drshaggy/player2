@@ -65,7 +65,7 @@ src/lib/utils/
 
 ### 2.3 Remove silent failure paths ✅
 - `route.ts:145`: When `selectedMoveIndex` is out of range, return a 422 with the LLM's raw response in the error payload so the agent can see what went wrong. Do not fall back to move #1. **Done (Phase 2.7).**
-- `ChessGame.tsx:576`: The "undo player move on AI failure" path is good UX but swallows the error type. Log the error category (network / LLM / parse) so the agent can diagnose. **Deferred** — still logs the raw error; category tagging deferred to Phase 3 testing harness.
+- `ChessGame.tsx:576`: The "undo player move on AI failure" path is good UX but swallows the error type. Log the error category (network / LLM / parse) so the agent can diagnose. **Done** — `categorizeAiMoveError` in `src/lib/utils/errorCategorize.ts` classifies errors by HTTP status + message pattern; `useChessGame.makeAIMove` logs `[category]: message { httpStatus, raw }`. Unit-tested (`errorCategorize.test.ts`, 14 cases).
 
 ### 2.4 Consolidate prompts ✅
 - `src/lib/prompts/index.js` and `index.ts` both existed. Deleted the `.js` file (Phase 1.2, commit `35ddb2c`). ARCHITECTURE.md updated to reference `index.ts`.
