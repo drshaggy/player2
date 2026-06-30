@@ -40,11 +40,15 @@ export function useGamePersistence({
 
   useEffect(() => {
     async function fetchCoach() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('username', 'Coach')
         .single();
+      if (error) {
+        console.error('Failed to load Coach opponent profile:', error);
+        return;
+      }
       setOpponent(data);
       opponentRef.current = data;
     }
