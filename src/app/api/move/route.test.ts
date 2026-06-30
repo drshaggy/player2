@@ -89,4 +89,63 @@ describe('Move API Route', () => {
     const data = await response.json();
     expect(data).toHaveProperty('move');
   });
+
+  it('returns 422 with debug payload when LLM returns an out-of-range index', async () => {
+    process.env.LLM_API_KEY = 'test-key';
+
+    const payload = {
+      fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+      candidates: [
+        { move: 'e5', score: '0.3', depth: 10, from: 'e7', to: 'e5' },
+        { move: 'c5', score: '0.4', depth: 10, from: 'c7', to: 'c5' },
+      ],
+      persona: 'aggressive',
+      sessionGoal: '',
+      openingContext: [],
+    };
+
+    // LLM picks index 99 — out of range. Must NOT silently fall back to move 1.
+    global.fetch = vi.fn().mockResolvedValue(mockLlmResponse(99, 'Bad pick'));
+
+    const req = {
+      json: async () => payload,
+    } as unknown as Parameters<typeof POST>[0];
+
+    const response = await POST(req);
+    expect(response.status).toBe(422);
+
+    const data = await response.json();
+    expect(data.error).toMatch(/out-of-range/);
+    expect(data.candidateCount).toBe(2);
+    expect(data.llmResponse).toContain('99');
+  });
+
+  it('returns 422 when LLM response is missing selectedMoveIndex', async () => {
+    process.env.LLM_API_KEY = 'test-key';
+
+    const payload = {
+      fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+      candidates: [{ move: 'e5', score: '0.3', depth: 10, from: 'e7', to: 'e5' }],
+      persona: 'aggressive',
+      sessionGoal: '',
+      openingContext: [],
+    };
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ commentary: 'no index here' }) } }],
+      }),
+      text: async () => JSON.stringify({ commentary: 'no index here' }),
+    });
+
+    const req = {
+      json: async () => payload,
+    } as unknown as Parameters<typeof POST>[0];
+
+    const response = await POST(req);
+    expect(response.status).toBe(422);
+    const data = await response.json();
+    expect(data.error).toMatch(/missing selectedMoveIndex/);
+  });
 });

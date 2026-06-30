@@ -139,10 +139,24 @@ export async function POST(req: NextRequest) {
 
       if (!result || typeof result.selectedMoveIndex !== 'number') {
         console.error('LLM response missing selectedMoveIndex:', result);
-        throw new Error('LLM response missing selectedMoveIndex');
+        return NextResponse.json({
+          error: 'LLM response missing selectedMoveIndex',
+          llmResponse: content,
+          parsed: result,
+        }, { status: 422 });
       }
 
-      const chosenCandidate = processedCandidates[result.selectedMoveIndex - 1] || processedCandidates[0];
+      const selectedIndex = result.selectedMoveIndex - 1;
+      if (selectedIndex < 0 || selectedIndex >= processedCandidates.length) {
+        console.error(`LLM returned out-of-range selectedMoveIndex ${result.selectedMoveIndex} (valid: 1..${processedCandidates.length}):`, content);
+        return NextResponse.json({
+          error: `LLM returned out-of-range selectedMoveIndex ${result.selectedMoveIndex} (valid: 1..${processedCandidates.length})`,
+          llmResponse: content,
+          candidateCount: processedCandidates.length,
+        }, { status: 422 });
+      }
+
+      const chosenCandidate = processedCandidates[selectedIndex];
 
       return NextResponse.json({
         move: {
