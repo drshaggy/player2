@@ -47,7 +47,7 @@ Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix 
 ## Safe-to-touch vs. Dangerous Zones
 - **Safe (iterate freely):** `src/lib/**`, `src/components/**` (presentational components are decomposed), `src/hooks/**`, `supabase/migrations/**`, tests, fixtures, prompts.
 - **Dangerous (flag for human review before changing):**
-  - RLS policies — source of truth is `supabase/migrations/20260629100103_rls_policies.sql`. Do not edit the `supabase/rls.sql` reference copy as the canonical policy set.
+  - RLS policies — source of truth is `supabase/migrations/20260629000103_rls_policies.sql`. The `supabase/rls.sql` reference copy is kept in sync but is NOT the canonical policy set.
   - `next.config.ts`, `vercel.json`, Vercel project config, env var wiring.
   - `supabase/config.toml` (local stack config).
 - **Component size rule:** No component file should exceed ~250 lines. If it does, extract a hook or a child component. (See ENGINEERING_PLAN §2.1.)
@@ -62,7 +62,7 @@ Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix 
 - `moves`: Chronological move history linked to games.
 - `game_chat`: Chat messages linked to games.
 - **Auth**: Integrated with Supabase Auth; automatic profile creation via PG trigger.
-- **RLS**: Source of truth is `supabase/migrations/20260629100103_rls_policies.sql`.
+- **RLS**: Source of truth is `supabase/migrations/20260629000103_rls_policies.sql`.
 
 ## Deployment (Vercel)
 - **Production URL**: https://player2-drab.vercel.app
@@ -113,3 +113,4 @@ Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix 
 - [x] ENGINEERING_PLAN Phase 5 — Agent enablement audit (added Safe-to-touch vs. Dangerous Zones, surfaced 250-line component rule in AGENTS.md).
 - [x] Extract `useChessGame` / `useCoachChat` / `useGamePersistence` hooks from `ChessGame.tsx` (657 → 135 lines; all extracted files under the 250-line rule).
 - [x] Consultation playable-state guard — prompt constrains side-to-move `w`; client auto-plays Black if LLM/user gives a Black-to-move FEN.
+- [x] Fix RLS/constraint drift — added missing `games` INSERT policy (client-side game creation was silently blocked); added `'finished'` to `games.status` CHECK constraint (local migration was behind production; `finishGame()` would 400 on "New Game"). Corrected stale RLS migration filename in docs (`20260629100103` → `20260629000103`).

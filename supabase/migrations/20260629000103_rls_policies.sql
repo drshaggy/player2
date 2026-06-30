@@ -25,6 +25,13 @@ CREATE POLICY "Players can update their own games" ON public.games
     auth.uid() = black_player_id
   );
 
+-- Games: Players involved can insert (create) a game
+CREATE POLICY "Players can insert their own games" ON public.games
+  FOR INSERT WITH CHECK (
+    auth.uid() = white_player_id OR 
+    auth.uid() = black_player_id
+  );
+
 -- Moves: Players involved in the game can view moves
 CREATE POLICY "Players can view moves of their own games" ON public.moves
   FOR SELECT USING (

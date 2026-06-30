@@ -39,7 +39,7 @@ CREATE TABLE public.games (
   black_player_id UUID NOT NULL REFERENCES public.profiles(id),
   current_fen TEXT NOT NULL,
   current_turn CHAR(1) NOT NULL CHECK (current_turn IN ('w', 'b')),
-  status TEXT NOT NULL DEFAULT 'ongoing' CHECK (status IN ('ongoing', 'white_win', 'black_win', 'draw')),
+  status TEXT NOT NULL DEFAULT 'ongoing' CHECK (status IN ('ongoing', 'white_win', 'black_win', 'draw', 'finished')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
