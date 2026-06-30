@@ -55,7 +55,7 @@ src/hooks/
 ### 2.2 Fix the stubs
 
 - **`generateSemanticState`**: Implement real phase detection (count pieces → opening/middlegame/endgame) and material balance (pawn-weighed piece counts). Pure function, trivially testable.
-- **`getOpeningMove` persona map**: Either remove the `persona` parameter (callers pass `'balanced'` which isn't in the map anyway) or extend the map to include `'balanced'`. Decide and document.
+- **`getOpeningMove` persona param:** The persona values (`'balanced'` / `'aggressive'` / `'solid'`) are placeholders and the matching map is broken (maps `'patient'`, never passed). **Persona rework is deferred** (see §7) — for now, do not invest in fixing the map piecemeal. Either drop the unused parameter or leave it as a no-op pass-through, and add a `TODO` pointing to the deferred persona-rework track. Do not pretend the current values are canonical.
 
 ### 2.3 Remove silent failure paths
 
@@ -167,12 +167,16 @@ Vercel Preview deployments share production env vars by default, so a preview UR
 
 ### 4.2 Solution: Three-tier environments
 
+**Decision (free Supabase tier):** use a separate staging Supabase project for previews. Branching is documented as the future upgrade path but not the current approach.
+
 ```
-LOCAL  →  PREVIEW (per-branch)  →  PRODUCTION
- ↑              ↑                      ↑
-local Supabase   branch Supabase        prod Supabase
-(ephemeral)      (Supabase Branching)   (shared)
+LOCAL  →  PREVIEW (per-branch)        →  PRODUCTION
+ ↑              ↑                            ↑
+local Supabase  staging Supabase project      prod Supabase
+(ephemeral)     (shared across all previews)  (shared)
 ```
+
+> Note: Vercel Preview URLs will share the staging DB across branches. This is acceptable because staging data is throwaway and isolated from prod. Per-branch DB isolation requires Supabase Branching (paid plan) — see §4.4.
 
 ### 4.3 Tier 1 — Local Supabase (for the agent + dev)
 
@@ -188,23 +192,20 @@ Already scaffolded (`supabase/config.toml`, migrations exist). Make it first-cla
 
 ### 4.4 Tier 2 — Preview deployments with isolated DB
 
-Use **Supabase Branching** (requires paid plan, but it's the cleanest solution). Each Vercel Preview deployment gets its own Supabase branch DB.
+**Chosen approach (free tier): staging Supabase project.** One shared staging DB backs all Vercel Preview deployments. Data is throwaway; isolated from production.
 
 Setup:
-1. Enable Supabase Branching on the project (Dashboard → Settings → Branching).
-2. Connect the Supabase project to the GitHub repo — Supabase will auto-create a branch DB per git branch.
-3. In Vercel, set **Preview Environment** env vars to point at the branch DB:
-   - `NEXT_PUBLIC_SUPABASE_URL` → the branch project URL (Supabase exposes this via the integration, or use the Vercel-Supabase integration which auto-injects).
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` → branch anon key.
-   - `SUPABASE_SERVICE_ROLE_KEY` → branch service role key.
+1. Create a second Supabase project: `player2-staging`.
+2. Link it locally: `supabase link --project-ref <staging-ref>` (or use the dashboard).
+3. Apply the same migrations: `supabase db push` (run after linking to staging). Keep migrations in sync by re-running `db push` against staging whenever a new migration lands on `main`.
+4. In Vercel → Settings → Environment Variables, set **Preview** scope to the staging project:
+   - `NEXT_PUBLIC_SUPABASE_URL` → staging project URL.
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` → staging anon key.
+   - `SUPABASE_SERVICE_ROLE_KEY` → staging service role key.
    - `LLM_API_KEY`, `LLM_ENDPOINT`, `LLM_MODEL` → reuse production values (LLM is stateless, safe to share).
-4. Vercel's Supabase integration auto-provisions per-branch env vars if both are connected to the same GitHub repo. Prefer this over manual env var management.
+5. Seed staging with the test user + Coach bot (see §6 step 14) so previews are usable on first load.
 
-**If branching is not available** (free tier), fallback:
-- Create a second Supabase project (`player2-staging`).
-- Run the same migrations against it.
-- Point Vercel Preview env vars at the staging project.
-- Manually keep migrations in sync (the agent should run `supabase db push --linked` against staging after merging to main).
+**Future upgrade path — Supabase Branching (requires paid plan):** enables a branch DB per git branch, auto-provisioned via the Vercel-Supabase integration. If the plan is upgraded later, swap the Vercel Preview env vars for the branch integration and delete the staging project. The rest of the workflow is unchanged.
 
 ### 4.5 Tier 3 — Production
 
@@ -213,10 +214,10 @@ Unchanged. `main` branch → Vercel Production → prod Supabase. Never push dir
 ### 4.6 Workflow rules
 
 1. **Branch per change:** `feat/...`, `fix/...`, `chore/...`.
-2. **Open PR → Vercel auto-creates Preview with isolated DB.**
+2. **Open PR → Vercel auto-creates Preview pointed at the staging Supabase project.**
 3. **Run `npm run verify` locally + smoke-test the preview URL.**
 4. **Squash-merge to `main`** → auto-deploys production.
-5. **DB migrations:** Create via `supabase migration new <name>`, test locally, commit. They apply to preview branches automatically and to prod on merge.
+5. **DB migrations:** Create via `supabase migration new <name>`, test locally, commit. After merge to `main`, push migrations to staging (`supabase db push` linked to staging) so previews stay in sync.
 
 ---
 
@@ -271,7 +272,7 @@ Sequenced so each step is independently shippable and the agent can verify as it
 ### Phase 4 — Deployment isolation
 13. **Document `.env.example`** and split `.env.local` for local Supabase. Commit.
 14. **Extend `supabase/seed.sql`** with test user + Coach bot + sample game. Commit.
-15. **Enable Supabase Branching** (or create staging project). Configure Vercel Preview env vars. Document in README. Commit.
+15. **Create `player2-staging` Supabase project**, push migrations, configure Vercel Preview env vars (§4.4). Document in README. Commit.
 16. **Add PR template** (`.github/pull_request_template.md`) reminding to run `npm run verify` and smoke-test the preview. Commit.
 
 ---
@@ -279,15 +280,16 @@ Sequenced so each step is independently shippable and the agent can verify as it
 ## 7. Non-Goals (explicitly out of scope)
 
 - Rewriting the AI pipeline logic — it works, just needs the silent-failure fix.
-- Adding new product features (endgame library expansion, new personas, etc.).
+- Adding new product features (endgame library expansion, etc.).
 - Performance optimization / caching.
 - Replacing Stockfish-on-WebSocket with an in-process engine.
+- **Persona system rework** — the current persona values are placeholders and the matching logic is broken. A full rework (canonical persona set, union type, wiring through the prompt + opening book) is a separate track of work. Do not piecemeal-fix the broken map; defer until that track is started.
 
 ---
 
-## 8. Open Questions for Human
+## 8. Resolved Decisions
 
-1. **Supabase plan tier?** Branching requires a paid plan. If on free tier, we use the staging-project fallback (§4.4).
-2. **Is `tests/` (empty) intended for Playwright?** If so, rename to `tests/e2e/` and document. If not, delete it.
-3. **`rls_policies.sql` at repo root** duplicates `supabase/migrations/20260629100103_rls_policies.sql` and `supabase/rls.sql`. Which is the source of truth? Recommend deleting the root copy.
-4. **Persona model:** is `'balanced'` / `'aggressive'` / `'solid'` the canonical set? If so, encode it as a union type and use it everywhere.
+1. **Supabase plan tier — free.** Use the staging-project approach (§4.4). Supabase Branching is documented as the future upgrade path only.
+2. **Empty `tests/` dir — model-created, refactoring permitted.** Canonical E2E location is `tests/e2e/`. The empty `tests/` is replaced by `tests/e2e/.gitkeep` to make intent concrete in the repo.
+3. **Root `rls_policies.sql` — duplicate, deleted.** Source of truth for RLS is `supabase/migrations/20260629100103_rls_policies.sql` (applied via migrations). `supabase/rls.sql` is a reference copy kept in `supabase/`; the root-level duplicate is removed.
+4. **Personas — placeholders, rework deferred.** See §7. Do not encode the current values as a canonical union type or fix the broken map piecemeal; wait for the dedicated persona-rework track.
