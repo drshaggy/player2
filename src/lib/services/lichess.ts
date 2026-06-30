@@ -33,12 +33,16 @@ export interface LichessOpeningResponse {
 
 export async function getMasterOpeningMoves(play: string, movesLimit = 5): Promise<LichessMove[]> {
   const url = `https://explorer.lichess.org/masters?play=${play}&moves=${movesLimit}`;
-  
+  const token = process.env.LICHESS_API_TOKEN;
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-    const response = await fetch(url, { signal: controller.signal });
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const response = await fetch(url, { signal: controller.signal, headers });
     clearTimeout(timeoutId);
 
     if (!response.ok) throw new Error(`Lichess API error: ${response.statusText}`);
