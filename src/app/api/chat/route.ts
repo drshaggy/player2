@@ -50,6 +50,8 @@ If the user requests a specific opening, position, or endgame scenario, you MUST
 Crucially, a partial FEN (piece placement only) is NOT acceptable; it must be a complete 6-field FEN.
 The SET_FEN command must be on its own line or clearly separated so it can be parsed. Do not wrap it in other text on the same line if possible.
 
+IMPORTANT - SIDE TO MOVE: The human player is ALWAYS White and moves first. The FEN's side-to-move field (the 2nd field) MUST be 'w' (White to move). Never emit a FEN where it is Black's turn. If the requested scenario would naturally have Black to move (e.g. a position after Black's reply, or "let me defend the Sicilian as Black"), instead return the position ONE PLY EARLIER — the position before Black's move — so that it becomes White's turn and the player can make the next move. If you cannot express the scenario with White to move, do not emit a SET_FEN at all; instead describe the position in words and ask the player how they'd like to proceed.
+
 Once they have clearly stated a goal (or you have suggested a position that fulfills their request), you MUST include the exact phrase 'TRANSITION_TO_GAME' in your response, followed by a summary of the goal they chose.
 
 

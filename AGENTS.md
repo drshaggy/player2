@@ -92,6 +92,7 @@ Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix 
 - Test fixtures centralized in `src/__fixtures__/` (`fens.ts`, `games.ts`, `lichessResponses.ts`, `llmResponses.ts`).
 - Component tests for `Board`, `ChatPanel`, `MoveHistory` (Testing Library + jest-dom, matchers in `vitest.setup.ts`).
 - E2E: Playwright (`playwright.config.ts`, `tests/e2e/`), opt-in via `npm run test:e2e`, excluded from vitest.
+- **Consultation phase playable-state guard**: the player is always White and moves first. The consultation LLM prompt (`/api/chat/route.ts`) constrains `SET_FEN` to side-to-move `w` (returning a position one ply earlier for naturally-Black-to-move scenarios). The client (`useCoachChat.ts`) additionally auto-calls `makeAIMove()` after the transition-to-game if the loaded FEN has Black to move, so consultation always exits with White to move regardless of LLM behavior. `processFen` is intentionally left generic — side-to-move enforcement lives at the consultation boundary, not the utility.
 
 ## Current Progress
 - [x] Project initialized with Next.js, TS, Tailwind.
@@ -111,3 +112,4 @@ Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix 
 - [x] ENGINEERING_PLAN Phase 4 — Deployment isolation (`.env.example` tiers, seed.sql, PR template). Staging backend (step 15) deferred indefinitely — develop against local Supabase.
 - [x] ENGINEERING_PLAN Phase 5 — Agent enablement audit (added Safe-to-touch vs. Dangerous Zones, surfaced 250-line component rule in AGENTS.md).
 - [x] Extract `useChessGame` / `useCoachChat` / `useGamePersistence` hooks from `ChessGame.tsx` (657 → 135 lines; all extracted files under the 250-line rule).
+- [x] Consultation playable-state guard — prompt constrains side-to-move `w`; client auto-plays Black if LLM/user gives a Black-to-move FEN.

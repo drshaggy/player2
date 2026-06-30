@@ -149,6 +149,18 @@ export function useCoachChat({
             if (currentUser && currentOpponent) {
               await createGame();
             }
+
+            // Guard: the player is always White. If the consultation FEN left
+            // it as Black's turn (LLM ignored the side-to-move constraint, or
+            // the user pasted such a FEN), have the AI play Black's move now so
+            // we always exit consultation in a playable state — White to move.
+            if (chessGameRef.current.turn() === 'b' && !chessGameRef.current.isGameOver()) {
+              try {
+                await makeAIMove();
+              } catch (err) {
+                console.error('Auto AI move (Black-to-move consultation guard) failed:', err);
+              }
+            }
           }
         }
       } else {
