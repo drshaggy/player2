@@ -9,10 +9,10 @@ Player 2 is an AI-powered chess coaching application designed to guide users thr
 The move selection process follows a strict hierarchy to ensure educational goals take priority over optimal engine play:
 `Session Goal` $\rightarrow$ `Opening Book Mapping` $\rightarrow$ `Lichess Masters Theory` $\rightarrow$ `Stockfish Multi-PV Candidates` $\rightarrow$ `LLM Selection` $\rightarrow$ `Final Move`.
 
-- **Opening Book**: A hierarchical tree lookup (`src/lib/openingBook.ts`) that provides a map of opening names to specific SAN moves. It is queried on every turn to ensure goal alignment throughout the opening phase. `getOpeningMoves(history)` traverses the tree; `getOpeningMove(history, persona)` selects one (persona matching is a placeholder — see ENGINEERING_PLAN §7).
-- **Lichess Masters Database**: `src/lib/services/lichess.ts` — fetches statistically most-played moves by masters for the current position. Injected as high-priority candidates to guide the AI toward theory.
+- **Opening Book**: A hierarchical tree lookup (`src/lib/openingBook.ts`) that provides a map of opening names to specific SAN moves. It is queried on every turn to ensure goal alignment throughout the opening phase. `getOpeningMoves(history)` traverses the tree; `getOpeningMove(history, persona)` selects one (persona matching is a placeholder — see ENGINEERING_PLAN §7). `getOpeningMovesByFen(fen)` is the FEN-based fallback for consultation games where chess.js history is empty (load doesn't populate move history).
+- **Lichess Masters Database**: `src/lib/services/lichess.ts` — fetches statistically most-played moves by masters for the current position. Injected as high-priority candidates to guide the AI toward theory. `getMasterOpeningMoves(play)` uses the UCI move-history parameter; `getMasterOpeningMovesByFen(fen)` uses the FEN parameter (auth-gated) for consultation games with empty history.
 - **Stockfish**: Generates a list of legal candidate moves with evaluation scores via the `chess-api.com` WebSocket (in `src/hooks/useChessGame.ts` `makeAIMove`).
-- **LLM (Cerebras Gemma-4)**: Receives the context and selects the move index based on the session objective. The `/api/move` route enforces index bounds and returns 422 on out-of-range or missing indices (no silent fallback).
+- **LLM**: Any OpenAI-compatible chat completions endpoint (configured via `LLM_ENDPOINT` / `LLM_MODEL` env vars — both required, no default). Receives the context and selects the move index based on the session objective. The `/api/move` route enforces index bounds and returns 422 on out-of-range or missing indices (no silent fallback).
 
 ### 2. Prompting Strategy
 To prevent LLM hallucinations regarding move indices, the system uses:
@@ -43,7 +43,7 @@ src/lib/utils/
   board.ts          # generateAsciiBoard, generateSemanticState
 ```
 
-**Cross-hook wiring:** the orchestrator owns the shared refs (`chessGameRef`, `boardInstanceRef`, `boardRef`, `sessionGoalRef`). Two latest-callback refs break the circular call-order dependency: `setChatMessagesRef` (let `useChessGame.makeAIMove` append AI commentary) and `applyRestoredStateRef` (let `useGamePersistence`'s restore effect sync the other hooks' UI state after replay).
+**Cross-hook wiring:** the orchestrator owns the shared refs (`chessGameRef`, `boardInstanceRef`, `boardRef`, `sessionGoalRef`). Three latest-callback refs break the circular call-order dependency: `setChatMessagesRef` (let `useChessGame.makeAIMove` append AI commentary), `setIsTypingRef` (let `useChessGame.makeAIMove` toggle the "Coach is thinking..." indicator during AI move calculation), and `applyRestoredStateRef` (let `useGamePersistence`'s restore effect sync the other hooks' UI state after FEN load).
 
 ## Tech Stack
 - **Frontend/Backend**: Next.js (App Router), TypeScript, Tailwind CSS.
@@ -54,4 +54,4 @@ src/lib/utils/
 ## Key Workflows
 - **Goal Alignment**: If a user sets a goal (e.g., "Caro-Kann"), the system filters the opening book, identifies the move `c6`, finds `c6` in the Stockfish candidates, and forces the LLM to select that index.
 - **Consultation Phase**: Before a game starts, the user chats with the coach to set a goal. The coach can suggest a FEN (`SET_FEN:`) or transition to play (`TRANSITION_TO_GAME`).
-- **Game Persistence**: Moves, chat, and FEN are persisted to Supabase. On reload, the game is restored by replaying move history from the `moves` table.
+- **Game Persistence**: Moves, chat, and FEN are persisted to Supabase. On reload, the game is restored by loading `game.current_fen` directly (not replaying SANs — consultation-FEN games can't be replayed from the standard starting position).
