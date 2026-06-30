@@ -21,9 +21,14 @@ ON CONFLICT (username) DO UPDATE SET
 --    usable on first `npm run dev` without manual signup. Password is
 --    "password123" (bcrypt-hashed; verified with bcryptjs). Never use this
 --    credential in staging/prod.
+--    NOTE: GoTrue requires a matching row in auth.identities — without it,
+--    /auth/v1/token?grant_type=password returns 500 "Database error querying
+--    schema". The handle_new_user trigger does NOT fire for manual inserts.
 INSERT INTO auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-  created_at, updated_at, raw_app_meta_data, raw_user_meta_data
+  created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
+  confirmation_token, recovery_token, email_change_token_new, email_change_token_current,
+  email_change, phone, phone_change, phone_change_token, reauthentication_token
 ) VALUES (
   '00000000-0000-0000-0000-000000000000',
   '00000000-0000-4000-8000-000000000010',
@@ -32,9 +37,22 @@ INSERT INTO auth.users (
   '$2b$10$vo6XZg05UPABxQB82QIVkOIZXS1J1PsPUcLLUo5onSIJWtb8j7X26', -- "password123"
   now(), now(), now(),
   '{"provider":"email","providers":["email"]}',
-  '{"username":"Test Player","full_name":"Test Player"}'
+  '{"username":"Test Player","full_name":"Test Player"}',
+  '', '', '', '',
+  '', '', '', '', ''
 )
 ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO auth.identities (
+  provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+) VALUES (
+  '00000000-0000-4000-8000-000000000010',
+  '00000000-0000-4000-8000-000000000010',
+  '{"sub":"00000000-0000-4000-8000-000000000010","email":"test@player2.local","email_verified":true}',
+  'email',
+  now(), now(), now()
+)
+ON CONFLICT (provider_id, provider) DO NOTHING;
 
 -- Link the test user to a profile row (the auth trigger also does this, but
 -- seed runs after the trigger is defined; upsert to be safe).
