@@ -4,19 +4,23 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ### Prerequisites
 - Node.js (see `.nvmrc`/`package.json` engines)
-- Docker (for local Supabase)
+- Docker (for local Supabase). On macOS we recommend **Colima** (`brew install colima`): `colima start`. Docker Desktop works too.
 - Supabase CLI: `npm install -g supabase` (or `npx supabase`)
+
+> **Colima note:** the local Supabase `vector` log-forwarder container bind-mounts the docker socket, which Colima's VZ runtime cannot support. `[analytics] enabled = false` is already set in `supabase/config.toml` to skip it. Log shipping is not needed for local dev/E2E. If you switch to Docker Desktop you can re-enable analytics.
 
 ### First run
 ```bash
 npm install
-supabase start            # boots local Postgres + Auth (Docker)
-npm run db:reset          # apply migrations + seed (test user, Coach bot, sample game)
+colima start            # macOS only; skip if using Docker Desktop
+supabase start          # boots local Postgres + Auth (Docker)
+npm run db:reset        # apply migrations + seed (test user, Coach bot, sample game)
 cp .env.example .env.local
-# Edit .env.local:
-#   NEXT_PUBLIC_SUPABASE_URL  → http://127.0.0.1:54321
-#   NEXT_PUBLIC_SUPABASE_ANON_KEY + SUPABASE_SERVICE_ROLE_KEY → from `supabase status`
-#   LLM_API_KEY               → your Cerebras (or compatible) key
+# Edit .env.local — for LOCAL dev, pull keys from `supabase status`:
+#   NEXT_PUBLIC_SUPABASE_URL          → http://127.0.0.1:54321
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY     → sb_publishable_...  (from `supabase status`)
+#   SUPABASE_SERVICE_ROLE_KEY         → sb_secret_...       (from `supabase status`)
+#   LLM_API_KEY                       → your Cerebras (or compatible) key
 npm run dev
 ```
 
@@ -27,10 +31,26 @@ The seeded test user is `test@player2.local` / `password123` (local only — nev
 |---|---|
 | `npm run dev` | Start the dev server |
 | `npm run verify` | typecheck + lint + unit/component/scenario tests (run before every commit) |
-| `npm run test:e2e` | Playwright E2E against local Supabase (needs `npm run db:reset` first) |
+| `npm run test:e2e` | Playwright E2E against local Supabase (needs `npm run db:reset` first; see E2E run below) |
 | `npm run test:scenarios` | Run the move-pipeline scenario tests only |
 | `npm run db:reset` | Reset local DB (migrations + seed) |
 | `npm run build` | Production build |
+
+### Running E2E locally
+E2E is opt-in (not part of `npm run verify`) because it needs a running local Supabase stack and a DB-shaped `.env.local`. The `playwright.config.ts` `webServer` boots `npm run dev` itself; you only need Supabase + env.
+
+```bash
+colima start && supabase start     # macOS + Colima; skip colima on Docker Desktop
+npm run db:reset                   # clean seeded state (test user, Coach bot)
+# Back up your prod-pointing .env.local, then point it at local Supabase:
+cp .env.local .env.local.bak
+#   NEXT_PUBLIC_SUPABASE_URL          → http://127.0.0.1:54321
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY     → sb_publishable_...  (from `supabase status`)
+#   SUPABASE_SERVICE_ROLE_KEY         → sb_secret_...       (from `supabase status`)
+npm run test:e2e
+mv .env.local.bak .env.local       # restore prod-pointing env
+supabase stop                      # tear down the stack when done
+```
 
 ## Deployment
 

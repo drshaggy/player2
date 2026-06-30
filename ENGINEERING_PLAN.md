@@ -4,9 +4,7 @@
 **Audience:** Future coding agents (small model) and human contributors.
 **Goal:** Shore up the architecture so a small model can safely iterate, build a testing harness that catches real bugs (not just happy paths), and stop deploying to production to test changes.
 
-> **Resume note:** The codebase is in a working state — `npm run verify` passes (81 tests across 14 files: typecheck, lint, unit + component + scenario tests), `npm run build` succeeds. E2E is wired (`npm run test:e2e`, opt-in, needs local Supabase). Phases 1-5 are done; the staging backend (step 15) is deferred indefinitely (§4.4). `ChessGame.tsx` is a 135-line orchestrator over `useChessGame` / `useCoachChat` / `useGamePersistence`. Remaining deferred track: persona system rework (§7).
->
-> **UNCOMMITTED — Phase 5 step 18 (hook extraction) is in the working tree but not yet committed.** Docker was previously down on this machine; before committing, run `npm run db:reset && npm run test:e2e` to confirm behavior was preserved (the extraction touched a Dangerous-zone file). See AGENTS.md "Resume State" for the file list and post-E2E commit instructions.
+> **Resume note:** The codebase is in a working state — `npm run verify` passes (81 tests across 14 files: typecheck, lint, unit + component + scenario tests), `npm run build` succeeds, and E2E passes (`npm run test:e2e`, 2 specs). Phases 1-5 are done; the staging backend (step 15) is deferred indefinitely (§4.4). `ChessGame.tsx` is a 135-line orchestrator over `useChessGame` / `useCoachChat` / `useGamePersistence`. Remaining deferred track: persona system rework (§7).
 
 ---
 
@@ -187,13 +185,13 @@ local Supabase  staging backend TBD (§4.4)           prod cloud project
 
 Already scaffolded (`supabase/config.toml`, migrations exist). Make it first-class:
 
-- **Command:** `supabase start` (requires Docker).
+- **Command:** `supabase start` (requires Docker). On macOS, `colima start` first — Colima's VZ runtime can't bind-mount the docker socket, so `[analytics] enabled = false` is set in `supabase/config.toml` to skip the `vector` log-forwarder container. Log shipping isn't needed locally; re-enable for Docker Desktop if desired.
 - **DB:** Local Postgres on `54322`, auto-applies all migrations in `supabase/migrations/`.
-- **Env:** Create `.env.local` pointing at local Supabase. Add `.env.development` (gitignored) for the dev server, `.env.example` (committed) documenting required vars.
+- **Env:** Create `.env.local` pointing at local Supabase. Add `.env.development` (gitignored) for the dev server, `.env.example` (committed) documenting required vars. Pull `NEXT_PUBLIC_SUPABASE_ANON_KEY` + `SUPABASE_SERVICE_ROLE_KEY` from `supabase status`.
 - **Seed:** `supabase/seed.sql` already exists — extend it to seed a test user + a Coach bot + a sample game so the app is usable on first `npm run dev`.
 - **Reset:** `npm run db:reset` → `supabase db reset` (re-applies migrations + seed). Critical for the agent to get a clean slate between test runs.
 
-**Agent rule:** Before running E2E or manual verification, run `npm run db:reset` to ensure a known DB state.
+**Agent rule:** Before running E2E or manual verification, run `npm run db:reset` to ensure a known DB state. For E2E specifically, `.env.local` must point at local Supabase (`http://127.0.0.1:54321`) — back up the prod-pointing `.env.local`, swap, run `npm run db:reset && npm run test:e2e`, then restore. See README "Running E2E locally" for the exact sequence.
 
 ### 4.4 Tier 2 — Preview deployments with isolated DB
 
@@ -229,7 +227,7 @@ Add the following to `AGENTS.md` so the small model has clear rails:
 ```
 Before completing any task:
 1. npm run verify         (typecheck + lint + unit tests)
-2. If touching DB:        supabase db reset && npm run test:e2e
+2. If touching DB:        swap .env.local to local Supabase → npm run db:reset && npm run test:e2e → restore .env.local
 3. If touching UI:        smoke-test the relevant flow in the browser
 Never: skip a test, weaken an assertion, or commit with a failing verify.
 ```

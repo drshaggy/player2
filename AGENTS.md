@@ -8,20 +8,6 @@
 - **Update all Docs**  - When asked to update all docs, all .md files
 - Add new md files to this list so you know to read them
 
-## Resume State (UNCOMMITTED WORK — read first)
-There is **uncommitted work** in the working tree from Phase 5 step 18 (`ChessGame.tsx` hook extraction). `git status` shows:
-- **New:** `src/hooks/useChessGame.ts`, `src/hooks/useCoachChat.ts`, `src/hooks/useGamePersistence.ts`, `src/lib/utils/boardInput.ts`, `src/lib/utils/chess.test.ts`
-- **Modified:** `src/components/ChessGame.tsx` (657 → 135 lines), `src/lib/utils/chess.ts` (+`computeCapturedPieces`), `AGENTS.md`, `ARCHITECTURE.md`, `ENGINEERING_PLAN.md`
-
-`npm run verify` passes (typecheck + lint + 81 tests across 14 files) and `npm run build` succeeds. Behavior was preserved by moving code blocks verbatim into hooks.
-
-**PENDING — E2E gate not yet run.** The extraction touched a Dangerous-zone file (`ChessGame.tsx`). Docker was previously down on this machine; the user is bringing it up. Before committing, run:
-```
-npm run db:reset && npm run test:e2e
-```
-If E2E passes, commit the work (user has not yet authorized a commit — ask first). If E2E fails, fix the root cause in the hook files; do not weaken the E2E assertions. After the commit lands, delete this "Resume State" section.
-
-
 ## Project Setup
 - **Project Path**: `/Users/connor/Repos/cerebras-hackathon/player2`
 - **Tech Stack**: Next.js (App Router), TypeScript, Tailwind CSS, Supabase.
@@ -45,7 +31,7 @@ If E2E passes, commit the work (user has not yet authorized a commit — ask fir
 ## Verification Protocol (for agents)
 Before completing any task:
 1. `npm run verify` (typecheck + lint + unit/component/scenario tests)
-2. If touching DB: `npm run db:reset && npm run test:e2e`
+2. If touching DB: swap `.env.local` to local Supabase (see "Local Supabase on Colima" under Known Build Fixes) → `npm run db:reset && npm run test:e2e` → restore `.env.local`
 3. If touching UI: smoke-test the relevant flow in the browser via `npm run dev`
 Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix the root cause.
 
@@ -93,6 +79,7 @@ Never: skip a test, weaken an assertion, or commit with a failing `verify`. Fix 
   - `src/app/page.tsx` uses `export const dynamic = 'force-dynamic'` because `ChessGame` eagerly creates a Supabase client at module load.
   - `cm-chessboard` requires a custom TypeScript declaration file (`src/types/cm-chessboard.d.ts`).
   - `ChessGame.tsx` has a scoped `eslint-disable` for `react-hooks/refs` (the `applyRestoredStateRef` latest-callback pattern). The hook files have scoped `eslint-disable`s for `any`/`exhaustive-deps`/`refs` where cm-chessboard's untyped event handlers and the latest-callback ref pattern require them.
+  - **Local Supabase on Colima**: `[analytics] enabled = false` in `supabase/config.toml` — the `vector` log-forwarder container bind-mounts the docker socket, which Colima's VZ runtime cannot support. Analytics (log shipping) is not needed for E2E. Start Colima with `colima start` (socket at `~/.colima/default/docker.sock`); `npx supabase start` then works. For E2E, `.env.local` must point at local Supabase (`http://127.0.0.1:54321`) — back up the prod-pointing `.env.local`, swap, run `npm run db:reset && npm run test:e2e`, then restore.
 
 ## Architecture Summary (post-Phase 5)
 - `ChessGame.tsx` (135 lines) is now a thin orchestrator: owns the shared refs (`chessGameRef`, `boardInstanceRef`, `boardRef`, `sessionGoalRef`) and wires the hooks. The remaining `any`/`react-hooks/refs` disables are scoped to the hook files where cm-chessboard's untyped event handlers and the latest-callback ref pattern require them.
